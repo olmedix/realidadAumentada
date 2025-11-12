@@ -1,71 +1,247 @@
-<!doctype html>
-<html lang="es">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR fijo: cubo en posición absoluta</title>
-
-  <!-- A-Frame -->
-  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-
-  <style>
-    html,body{margin:0;height:100%}
-    #start{
-      position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-      z-index:20;padding:12px 16px;font:600 16px system-ui;border:0;border-radius:12px;
-      background:#0ea5e9;color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.25);cursor:pointer
-    }
-    a-scene{background:transparent !important}
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AR con Detección de Movimiento</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://inspirit.github.io/jsfeat/build/jsfeat-min.js"></script>
 </head>
 <body>
-  <button id="start">Iniciar AR</button>
+  <video id="cam" autoplay muted playsinline style="display: none;"></video>
+  <canvas id="canvas" style="display: none;"></canvas>
 
-  <a-scene id="scene"
-    embedded
-    renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true; alpha:true"
-    webxr="mode: ar"
-    vr-mode-ui="enabled:false"
-    xr-mode-ui="enabled:false"
-    loading-screen="enabled:false">
+  <a-scene>
+    <a-box id="reference-box" position="0 1.6 -5" color="#FF6B6B" shadow="cast: true;"></a-box>
+    <a-box position="2 1.6 -5" color="#4CC3D9"></a-box>
+    <a-box position="-2 1.6 -5" color="#FFC65D"></a-box>
 
-    <!-- Luces sencillas -->
-    <a-entity light="type:ambient; intensity:0.9"></a-entity>
-    <a-entity light="type:directional; intensity:1.0" position="0 2 1"></a-entity>
+    <a-light type="directional" intensity="0.6" position="2 4 2"></a-light>
 
-    <!-- 👇 CUBO FIJO: 0.75 m de alto, 1 m delante del origen inicial -->
-    <a-box id="cubo"
-           position="0 0 -1"
-           depth="0.2" height="0.2" width="0.2"
-           material="color:#FF6A00; metalness:0.2; roughness:0.6">
-    </a-box>
-
-    <a-entity camera></a-entity>
+    <a-entity id="rig" position="0 1.6 0">
+      <a-entity id="camera" camera look-controls="pointerLockEnabled: false">
+        <a-cursor></a-cursor>
+        <a-plane position="0 0 -5" width="15" height="13"
+                 material="shader: flat; src: #cam">
+        </a-plane>
+      </a-entity>
+    </a-entity>
   </a-scene>
 
   <script>
-    const scene = document.getElementById('scene');
-    const start = document.getElementById('start');
+    const video = document.getElementById('cam');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const camera = document.getElementById('camera');
+    const rig = document.getElementById('rig');
 
-    // Pedimos la sesión AR directamente para evitar que entre en VR
-    async function startAR(){
-      const ok = await navigator.xr.isSessionSupported('immersive-ar');
-     
-      const session = await navigator.xr.requestSession('immersive-ar', {
-        optionalFeatures: ['local-floor'] // referencia con altura del suelo si está disponible
+    // Configuración
+    const WIDTH = 320;
+    const HEIGHT = 240;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    // Variables para optical flow
+    let prevFrame = null;
+    let currFrame = null;
+    let prevPoints = [];
+    let currPoints = [];
+    
+    // Posición acumulada
+    let cameraZ = 0;
+    let cameraX = 0;
+
+    // Sensibilidad
+    const SPEED = 0.1;
+
+    // Iniciar cámara
+    navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: "environment",
+        width: WIDTH,
+        height: HEIGHT
+      }
+    }).then(stream => {
+      video.srcObject = stream;
+      video.play();
+      
+      // Esperar a que el video esté listo
+      video.addEventListener('loadeddata', () => {
+        initTracking();
+        detectMotion();
       });
+    });
 
-      const gl = scene.renderer.getContext();
-      if (gl.makeXRCompatible) await gl.makeXRCompatible();
-      scene.renderer.xr.setSession(session);
-
-      start.style.display = 'none';
-      session.addEventListener('end', () => { start.style.display = 'inline-block'; });
+    function initTracking() {
+      // Inicializar buffers para jsfeat
+      prevFrame = new jsfeat.matrix_t(WIDTH, HEIGHT, jsfeat.U8_t | jsfeat.C1_t);
+      currFrame = new jsfeat.matrix_t(WIDTH, HEIGHT, jsfeat.U8_t | jsfeat.C1_t);
     }
 
-    start.addEventListener('click', () => {
-      startAR().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
-    });
+    function detectMotion() {
+      if (video.readyState !== 4) {
+        requestAnimationFrame(detectMotion);
+        return;
+      }
+
+      // Dibujar frame actual en canvas
+      ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+      const imageData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
+
+      // Copiar frame anterior a prevFrame
+      if (currFrame) {
+        prevFrame.data.set(currFrame.data);
+      }
+
+      // Convertir a escala de grises
+      jsfeat.imgproc.grayscale(imageData.data, WIDTH, HEIGHT, currFrame);
+
+      // Solo procesar si tenemos frame anterior
+      if (prevFrame && prevFrame.data.length > 0) {
+        // Detectar puntos característicos en frame anterior
+        if (prevPoints.length === 0) {
+          prevPoints = detectCorners(prevFrame);
+        }
+
+        // Calcular optical flow (movimiento de puntos)
+        currPoints = trackPoints(prevFrame, currFrame, prevPoints);
+
+        // Analizar el movimiento
+        analyzeMotion(prevPoints, currPoints);
+
+        // Actualizar puntos
+        prevPoints = currPoints;
+      }
+
+      requestAnimationFrame(detectMotion);
+    }
+
+    function detectCorners(frame) {
+      const corners = [];
+      const maxCorners = 50;
+      
+      // Detectar esquinas con algoritmo FAST
+      const corners_data = new jsfeat.matrix_t(WIDTH, HEIGHT, jsfeat.U8_t | jsfeat.C1_t);
+      jsfeat.fast_corners.set_threshold(20);
+      jsfeat.fast_corners.detect(frame, corners_data);
+
+      // Extraer coordenadas
+      for (let i = 0; i < corners_data.cols && corners.length < maxCorners; i++) {
+        for (let j = 0; j < corners_data.rows && corners.length < maxCorners; j++) {
+          if (corners_data.data[j * WIDTH + i] > 0) {
+            corners.push({ x: i, y: j });
+          }
+        }
+      }
+
+      return corners;
+    }
+
+    function trackPoints(prev, curr, points) {
+      // Implementación simplificada de Lucas-Kanade optical flow
+      const tracked = [];
+      const windowSize = 11;
+      const half = Math.floor(windowSize / 2);
+
+      for (let pt of points) {
+        let sumX = 0, sumY = 0, count = 0;
+
+        for (let dy = -half; dy <= half; dy++) {
+          for (let dx = -half; dx <= half; dx++) {
+            const px = pt.x + dx;
+            const py = pt.y + dy;
+
+            if (px >= 0 && px < WIDTH && py >= 0 && py < HEIGHT) {
+              const prevVal = prev.data[py * WIDTH + px];
+              const currVal = curr.data[py * WIDTH + px];
+              
+              const diff = currVal - prevVal;
+              sumX += dx * diff;
+              sumY += dy * diff;
+              count++;
+            }
+          }
+        }
+
+        if (count > 0) {
+          tracked.push({
+            x: pt.x + sumX / (count * 50),
+            y: pt.y + sumY / (count * 50)
+          });
+        }
+      }
+
+      return tracked;
+    }
+
+    function analyzeMotion(prev, curr) {
+      if (prev.length !== curr.length || prev.length === 0) return;
+
+      let avgDx = 0, avgDy = 0;
+      let avgScale = 0;
+      let validPoints = 0;
+
+      // Calcular movimiento promedio
+      for (let i = 0; i < Math.min(prev.length, curr.length); i++) {
+        const dx = curr[i].x - prev[i].x;
+        const dy = curr[i].y - prev[i].y;
+        
+        // Filtrar movimientos muy grandes (ruido)
+        if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+          avgDx += dx;
+          avgDy += dy;
+          validPoints++;
+        }
+      }
+
+      if (validPoints === 0) return;
+
+      avgDx /= validPoints;
+      avgDy /= validPoints;
+
+      // Calcular escala (zoom in/out indica adelante/atrás)
+      let totalDist = 0;
+      for (let i = 0; i < prev.length - 1; i++) {
+        for (let j = i + 1; j < prev.length; j++) {
+          const prevDist = distance(prev[i], prev[j]);
+          const currDist = distance(curr[i], curr[j]);
+          
+          if (prevDist > 0) {
+            totalDist += (currDist - prevDist) / prevDist;
+          }
+        }
+      }
+      
+      avgScale = totalDist / (prev.length * (prev.length - 1) / 2);
+
+      // Interpretar movimiento
+      // Movimiento hacia adelante: imagen se expande (scale > 0)
+      // Movimiento hacia atrás: imagen se contrae (scale < 0)
+      const forwardMotion = avgScale * 10;
+      
+      // Movimiento lateral: desplazamiento horizontal
+      const lateralMotion = -avgDx * 0.05;
+
+      // Aplicar movimiento al rig
+      const currentPos = rig.getAttribute('position');
+      cameraZ = currentPos.z + forwardMotion * SPEED;
+      cameraX = currentPos.x + lateralMotion * SPEED;
+
+      // Limitar rango
+      cameraZ = Math.max(-10, Math.min(10, cameraZ));
+      cameraX = Math.max(-10, Math.min(10, cameraX));
+
+      rig.setAttribute('position', `${cameraX} 1.6 ${cameraZ}`);
+
+      // Debug
+      if (Math.abs(forwardMotion) > 0.1 || Math.abs(lateralMotion) > 0.1) {
+        console.log(`Adelante: ${forwardMotion.toFixed(2)}, Lateral: ${lateralMotion.toFixed(2)}`);
+      }
+    }
+
+    function distance(p1, p2) {
+      return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+    }
   </script>
 </body>
 </html>
