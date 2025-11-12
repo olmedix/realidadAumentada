@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR simple con A-Frame</title>
+  <title>AR simple con A-Frame (forzado AR)</title>
 
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-  <!-- Componente de Hit-Test (detectar plano y colocar objeto con un toque) -->
+  <!-- Hit Test para colocar con un toque -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-ar-hit-test-component@1.3.0/dist/aframe-ar-hit-test-component.min.js"></script>
 
   <style>
@@ -24,7 +24,6 @@
       color:#fff;background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);
       font:600 14px/1.2 system-ui;pointer-events:none
     }
-    /* Fondo transparente por si la cámara tarda en aparecer */
     a-scene{background:transparent !important}
   </style>
 </head>
@@ -36,21 +35,21 @@
   <a-scene
     embedded
     renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true; alpha:true"
-    webxr="mode: ar; optionalFeatures: hit-test"
+    webxr="mode: ar; optionalFeatures: hit-test, local-floor"
     vr-mode-ui="enabled: false"
     xr-mode-ui="enabled: false">
 
-    <!-- Luces sencillas -->
+    <!-- Luces -->
     <a-entity light="type:ambient; intensity:0.7"></a-entity>
     <a-entity light="type:directional; intensity:0.9" position="0 2 1"></a-entity>
 
-    <!-- Tu objeto: un cubo de 20 cm. Empieza oculto hasta que lo coloques -->
+    <!-- Objeto: cubo de 20 cm (oculto hasta colocar) -->
     <a-box id="cubo" visible="false"
            depth="0.2" height="0.2" width="0.2"
            material="color:#FF6A00; metalness:0.2; roughness:0.6">
     </a-box>
 
-    <!-- El componente hace el retículo y, al tocar, coloca #cubo y lo deja anclado -->
+    <!-- Retículo + placement con un toque -->
     <a-entity ar-hit-test="target: #cubo"></a-entity>
 
     <a-entity camera></a-entity>
@@ -62,34 +61,50 @@
     const recolocarBtn = document.getElementById('recolocar');
     const cubo = document.getElementById('cubo');
 
-    // 1) Botón propio para iniciar AR (gesto del usuario)
-    startBtn.addEventListener('click', async () => {
-      try{
-        await scene.enterVR(); // con webxr mode: ar, esto abre AR (no VR)
-        startBtn.style.display = 'none';
-      }catch(e){
-        alert('No se pudo iniciar AR: ' + (e?.message || e));
+    // ✅ Pide immersive-ar directamente y conecta la sesión al renderer de A-Frame
+    async function startARSession() {
+      if (!('xr' in navigator)) {
+        alert('Tu navegador no expone navigator.xr');
+        return;
       }
+      const supported = await navigator.xr.isSessionSupported('immersive-ar');
+      if (!supported) {
+        alert('Este navegador/entorno no soporta AR (immersive-ar). Revisa que no esté en "Sitio de escritorio" y que ARCore esté actualizado.');
+        return;
+      }
+      const session = await navigator.xr.requestSession('immersive-ar', {
+        optionalFeatures: ['hit-test','local-floor']
+      });
+
+      // A-Frame: enlaza la sesión XR manualmente
+      const gl = scene.renderer.getContext();
+      if (gl.makeXRCompatible) { await gl.makeXRCompatible(); }
+      scene.renderer.xr.setSession(session);
+
+      // UI
+      startBtn.style.display = 'none';
+      session.addEventListener('end', () => {
+        startBtn.style.display = 'inline-block';
+        recolocarBtn.style.display = 'none';
+        cubo.setAttribute('visible', false);
+      });
+    }
+
+    startBtn.addEventListener('click', () => {
+      startARSession().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
     });
 
-    // 2) Mostrar botón "Recolocar" cuando el cubo ya está puesto
+    // Mostrar botón “Recolocar” cuando el cubo se haya colocado
     cubo.addEventListener('componentchanged', (e) => {
       if (e.detail.name === 'visible' && cubo.getAttribute('visible')) {
         recolocarBtn.style.display = 'inline-block';
       }
     });
 
-    // 3) Recolocar: ocultamos el cubo para que el próximo toque lo vuelva a colocar
+    // Recolocar: ocultamos el cubo para que el siguiente toque lo ubique de nuevo
     recolocarBtn.addEventListener('click', () => {
       cubo.setAttribute('visible', false);
       recolocarBtn.style.display = 'none';
-    });
-
-    // Si sales de AR, vuelve a mostrar el botón iniciar
-    scene.addEventListener('exit-vr', () => {
-      startBtn.style.display = 'inline-block';
-      recolocarBtn.style.display = 'none';
-      cubo.setAttribute('visible', false);
     });
   </script>
 </body>
