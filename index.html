@@ -1,108 +1,47 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>AR Movimiento Simple</title>
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-</head>
-<body>
-  <video id="cam" autoplay muted playsinline style="display: none;"></video>
-  <canvas id="canvas" style="display: none;"></canvas>
-
-  <a-scene>
-    <a-box position="0 1.6 -5" color="#FF6B6B"></a-box>
-    <a-sphere position="2 1.6 -5" color="#4CC3D9"></a-sphere>
-
-    <a-entity id="rig" position="0 1.6 0">
-      <a-entity camera look-controls>
-        <a-plane position="0 0 -5" width="15" height="13"
-                 material="shader: flat; src: #cam">
-        </a-plane>
-      </a-entity>
-    </a-entity>
-  </a-scene>
-
-  <script>
-    const video = document.getElementById('cam');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const rig = document.getElementById('rig');
-
-    canvas.width = 160;
-    canvas.height = 120;
-
-    let prevData = null;
-    let cameraZ = 0;
-
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: 640, height: 480 }
-    }).then(stream => {
-      video.srcObject = stream;
-      video.play();
-      detectMovement();
-    });
-
-    function detectMovement() {
-      if (video.readyState !== 4) {
-        requestAnimationFrame(detectMovement);
-        return;
-      }
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      if (prevData) {
-        // Calcular diferencia de movimiento
-        let totalDiff = 0;
-        let centerDiff = 0;
-        let edgeDiff = 0;
-
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const centerRadius = canvas.width / 4;
-
-        for (let i = 0; i < data.length; i += 4) {
-          const pixelIndex = i / 4;
-          const x = pixelIndex % canvas.width;
-          const y = Math.floor(pixelIndex / canvas.width);
-
-          const diff = Math.abs(data[i] - prevData[i]) +
-                      Math.abs(data[i+1] - prevData[i+1]) +
-                      Math.abs(data[i+2] - prevData[i+2]);
-
-          totalDiff += diff;
-
-          // Separar centro vs bordes
-          const distFromCenter = Math.sqrt((x - centerX)**2 + (y - centerY)**2);
-          
-          if (distFromCenter < centerRadius) {
-            centerDiff += diff;
-          } else {
-            edgeDiff += diff;
-          }
-        }
-
-        // Si los bordes se mueven más que el centro: movimiento hacia adelante
-        // Si el centro se mueve más: movimiento hacia atrás
-        const ratio = (edgeDiff / centerDiff) - 1;
-        
-        const speed = 0.05;
-        cameraZ += ratio * speed;
-        cameraZ = Math.max(-10, Math.min(10, cameraZ));
-
-        const currentPos = rig.getAttribute('position');
-        rig.setAttribute('position', `${currentPos.x} 1.6 ${cameraZ}`);
-
-        if (Math.abs(ratio) > 0.2) {
-          console.log(ratio > 0 ? 'Avanzando' : 'Retrocediendo', ratio.toFixed(2));
-        }
-      }
-
-      prevData = new Uint8ClampedArray(data);
+<script>
+  AFRAME.registerComponent('mobile-movement', {
+    init: function() {
+      this.velocity = new THREE.Vector3();
+      this.acceleration = new THREE.Vector3();
       
-      setTimeout(() => detectMovement(), 50); // 20 FPS
+      // Escuchar eventos de movimiento del dispositivo
+      window.addEventListener('devicemotion', (e) => {
+        if (e.acceleration) {
+          // Filtrar ruido (solo movimientos significativos)
+          const threshold = 0.5;
+          
+          const ax = Math.abs(e.acceleration.x) > threshold ? e.acceleration.x : 0;
+          const ay = Math.abs(e.acceleration.y) > threshold ? e.acceleration.y : 0;
+          const az = Math.abs(e.acceleration.z) > threshold ? e.acceleration.z : 0;
+          
+          this.acceleration.set(ax, ay, az);
+        }
+      });
+    },
+    
+    tick: function(time, delta) {
+      const deltaSeconds = delta / 1000;
+      const dampening = 0.9; // Fricción
+      
+      // Integrar aceleración -> velocidad
+      this.velocity.x += this.acceleration.x * deltaSeconds;
+      this.velocity.y += this.acceleration.y * deltaSeconds;
+      this.velocity.z += this.acceleration.z * deltaSeconds;
+      
+      // Aplicar fricción
+      this.velocity.multiplyScalar(dampening);
+      
+      // Aplicar velocidad -> posición
+      const pos = this.el.getAttribute('position');
+      pos.x += this.velocity.x * deltaSeconds * 0.1;
+      pos.y += this.velocity.y * deltaSeconds * 0.1;
+      pos.z += this.velocity.z * deltaSeconds * 0.1;
+      
+      this.el.setAttribute('position', pos);
     }
-  </script>
-</body>
-</html>
+  });
+</script>
+
+<a-entity id="rig" mobile-movement position="0 1.6 0">
+  <a-entity camera look-controls>...</a-entity>
+</a-entity>
