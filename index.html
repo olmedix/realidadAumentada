@@ -1,160 +1,73 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AR con retículo + fallback</title>
-<script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/aframe-ar-hit-test-component@1.3.0/dist/aframe-ar-hit-test-component.min.js"></script>
-<style>
-  html,body{margin:0;height:100%}
-  #start,#recolocar,#forzar{
-    position:fixed;left:50%;transform:translateX(-50%);
-    z-index:30;padding:12px 16px;font:600 16px system-ui;border:0;border-radius:12px;
-    background:#0ea5e9;color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.25);cursor:pointer
-  }
-  #start{top:50%}
-  #recolocar{bottom:16px;display:none}
-  #forzar{bottom:64px;display:none}
-  a-scene{background:transparent !important}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AR fijo: cubo en posición absoluta</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+  <style>
+    html,body{margin:0;height:100%}
+    #start{
+      position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+      z-index:20;padding:12px 16px;font:600 16px system-ui;border:0;border-radius:12px;
+      background:#0ea5e9;color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.25);cursor:pointer
+    }
+    a-scene{background:transparent !important}
+  </style>
 </head>
 <body>
-<button id="start">Iniciar AR</button>
-<button id="forzar">Forzar colocar delante</button>
-<button id="recolocar">Recolocar</button>
+  <button id="start">Iniciar AR</button>
 
-<a-scene id="scene"
-  embedded
-  renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true; alpha:true"
-  webxr="mode: ar"
-  vr-mode-ui="enabled:false"
-  xr-mode-ui="enabled:false"
-  loading-screen="enabled:false">
+  <a-scene id="scene"
+    embedded
+    renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true; alpha:true"
+    webxr="mode: ar"
+    vr-mode-ui="enabled:false"
+    xr-mode-ui="enabled:false"
+    loading-screen="enabled:false">
 
-  <!-- Luces -->
-  <a-entity light="type:ambient; intensity:0.9"></a-entity>
-  <a-entity light="type:directional; intensity:1.0" position="0 2 1"></a-entity>
+    <!-- Luces sencillas -->
+    <a-entity light="type:ambient; intensity:0.9"></a-entity>
+    <a-entity light="type:directional; intensity:1.0" position="0 2 1"></a-entity>
 
-  <!-- Texto 3D pegado a cámara (siempre visible) -->
-  <a-entity id="msg" position="0 -0.35 -1"
-            text="value: Pulsa Iniciar AR.; align: center; color: #ffffff; width: 2"></a-entity>
-  <a-entity camera></a-entity>
+    <!-- 👇 CUBO FIJO: 0.75 m de alto, 1 m delante del origen inicial -->
+    <a-box id="cubo"
+           position="0 0.75 -1"
+           depth="0.2" height="0.2" width="0.2"
+           material="color:#FF6A00; metalness:0.2; roughness:0.6">
+    </a-box>
 
-  <!-- Objeto a colocar -->
-  <a-box id="cubo" visible="true" depth="0.2" height="1" width="1"
-         material="color:#FF6A00; metalness:0.2; roughness:0.6"></a-box>
+    <a-entity camera></a-entity>
+  </a-scene>
 
-  <!-- Entidad del componente de hit-test (retículo por defecto, grande) -->
-  <a-entity id="hittest" ar-hit-test="target:#cubo; type: map; mapSize:0.45 0.45"></a-entity>
-</a-scene>
+  <script>
+    const scene = document.getElementById('scene');
+    const start = document.getElementById('start');
 
-<script>
-const $ = s => document.querySelector(s);
-const scene = $('#scene');
-const startBtn = $('#start');
-const recolocarBtn = $('#recolocar');
-const forzarBtn = $('#forzar');
-const cubo = $('#cubo');
-const msg3d = $('#msg');
-const hittest = $('#hittest');
+    // Pedimos la sesión AR directamente para evitar que entre en VR
+    async function startAR(){
+      if (!('xr' in navigator)) { alert('navigator.xr no disponible'); return; }
+      const ok = await navigator.xr.isSessionSupported('immersive-ar');
+      if (!ok) { alert('Este navegador no soporta immersive-ar'); return; }
 
-const say = (m)=> msg3d.setAttribute('text','value', m);
+      const session = await navigator.xr.requestSession('immersive-ar', {
+        optionalFeatures: ['local-floor'] // referencia con altura del suelo si está disponible
+      });
 
-// Eventos del componente ar-hit-test (si funciona, con esto basta)
-hittest.addEventListener('ar-hit-test-start',    ()=> say('Buscando superficie… mueve el móvil'));
-hittest.addEventListener('ar-hit-test-achieved', ()=> say('Superficie detectada. Toca para colocar.'));
-hittest.addEventListener('ar-hit-test-select',   ()=> { say('Colocado. Puedes “Recolocar”.'); forzarBtn.style.display='none'; });
+      const gl = scene.renderer.getContext();
+      if (gl.makeXRCompatible) await gl.makeXRCompatible();
+      scene.renderer.xr.setSession(session);
 
-// Mostrar “Recolocar” cuando el cubo aparezca
-cubo.addEventListener('componentchanged', (e) => {
-  if (e.detail.name==='visible') {
-    recolocarBtn.style.display = cubo.getAttribute('visible') ? 'inline-block' : 'none';
-  }
-});
-
-// Recolocar: oculta el cubo para que el siguiente toque lo ponga en otro sitio
-recolocarBtn.addEventListener('click', () => {
-  cubo.setAttribute('visible', false);
-  say('Superficie detectada. Toca para colocar.');
-});
-
-// Fallback: si el hit-test no “engancha”, te dejo forzar un placement delante de la cámara
-forzarBtn.addEventListener('click', () => {
-  // Coloca el cubo a ~1 m delante de la cámara y 0.1 m por encima (para que no “se hunda”)
-  cubo.setAttribute('position', '0 0.1 -1');
-  cubo.setAttribute('visible', true);
-  say('Colocado delante. (Prueba luego Recolocar cuando el retículo aparezca)');
-});
-
-// Arrancar AR pidiendo la sesión y conectándola al renderer de A-Frame
-async function startAR(){
-  if (!('xr' in navigator)) { alert('navigator.xr no disponible'); return; }
-  const ok = await navigator.xr.isSessionSupported('immersive-ar');
-  if (!ok) { alert('Este navegador no soporta immersive-ar'); return; }
-
-  // Pedimos hit-test como OPTIONAL (para no abortar la sesión si el servicio tarda)
-  const session = await navigator.xr.requestSession('immersive-ar', {
-    optionalFeatures: ['hit-test','local-floor','dom-overlay'],
-    domOverlay: { root: document.body }
-  });
-
-  const gl = scene.renderer.getContext();
-  if (gl.makeXRCompatible) await gl.makeXRCompatible();
-  scene.renderer.xr.setSession(session);
-  scene.emit('enter-vr'); // activa sistemas que escuchan este evento
-
-  startBtn.style.display = 'none';
-  forzarBtn.style.display = 'inline-block';
-  say('Buscando superficie… mueve el móvil');
-
-  // ====== Fallback de hit-test MANUAL ======
-  // Si el componente no emite 'achieved' en 4 s, intentamos nuestro propio hit-test.
-  let manualStarted = false;
-  setTimeout(()=> { if (!cubo.getAttribute('visible')) startManualHitTest(session); }, 4000);
-
-  session.addEventListener('end', () => {
-    scene.emit('exit-vr');
-    startBtn.style.display = 'inline-block';
-    recolocarBtn.style.display = 'none';
-    forzarBtn.style.display = 'none';
-    cubo.setAttribute('visible', false);
-    say('Pulsa Iniciar AR.');
-  });
-
-  async function startManualHitTest(sess){
-    if (manualStarted) return; manualStarted = true;
-    try{
-      const refSpace   = await sess.requestReferenceSpace('local');
-      const viewer     = await sess.requestReferenceSpace('viewer');
-      const htSource   = await sess.requestHitTestSource({ space: viewer });
-
-      // Bucle XR paralelo para detectar un impacto y encender el mensaje/retículo del comp.
-      const onXRFrame = (t, frame) => {
-        const results = frame.getHitTestResults(htSource);
-        if (results && results.length){
-          // Tenemos superficie: avisamos (si el comp no lo hizo)
-          say('Superficie detectada. Toca para colocar.');
-          // No colocamos aquí; dejamos que el componente gestione el tap y el retículo.
-        } else {
-          say('Buscando superficie… mueve el móvil (buena luz y textura)');
-        }
-        sess.requestAnimationFrame(onXRFrame);
-      };
-      sess.requestAnimationFrame(onXRFrame);
-    }catch(e){
-      // Si falla el fallback, mantenemos el botón Forzar para probar.
-      say('No se detecta plano aún. Prueba con más luz / textura o pulsa “Forzar”.');
+      start.style.display = 'none';
+      session.addEventListener('end', () => { start.style.display = 'inline-block'; });
     }
-  }
-}
 
-startBtn.addEventListener('click', () => {
-  startAR().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
-});
-
-// Mensaje inicial
-say('Pulsa Iniciar AR.');
-</script>
+    start.addEventListener('click', () => {
+      startAR().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
+    });
+  </script>
 </body>
 </html>
