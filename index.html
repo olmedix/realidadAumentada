@@ -3,75 +3,96 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
-  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-  <!-- Componente AR Hit Test -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-ar-hit-test-component@1.3.0/dist/aframe-ar-hit-test-component.min.js"></script>
-
   <style>
     html,body{margin:0;height:100%}
     #hud{position:fixed;left:0;right:0;top:0;padding:.6rem 1rem;color:#fff;
          background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);
          font:600 14px/1.2 system-ui;z-index:20;pointer-events:none}
-    /* Botón propio para iniciar AR (por si el default queda oculto) */
     #startAR{
       position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-      z-index:30; padding:14px 18px; font:600 16px system-ui;
-      border-radius:12px; border:none; cursor:pointer;
-      background:#0ea5e9; color:#fff; box-shadow:0 10px 30px rgba(0,0,0,.25);
+      z-index:30;padding:14px 18px;font:600 16px system-ui;border-radius:12px;border:none;cursor:pointer;
+      background:#0ea5e9;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.25)
     }
-    /* Asegura que el botón por defecto de A-Frame no quede tapado */
-    .a-enter-vr-button{ z-index:25 !important; }
+    #log{position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow:auto;
+         background:rgba(0,0,0,.7);color:#0ff;font:12px/1.3 ui-monospace,monospace;padding:.5rem;z-index:40}
   </style>
 </head>
 <body>
   <div id="hud">Mueve el móvil hasta ver el retículo y toca para colocar el cubo</div>
   <button id="startAR">Iniciar AR</button>
+  <pre id="log"></pre>
 
-  <a-scene
+  <a-scene id="scene"
     embedded
     renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true"
-    webxr="mode: ar; requiredFeatures: hit-test; optionalFeatures: dom-overlay; overlayElement: #hud"
-    xr-mode-ui="enabled: true"   <!-- también muestra el botón nativo por si acaso -->
-  >
-    <!-- Luces -->
+    xr-mode-ui="enabled: true"
+    webxr="mode: ar; optionalFeatures: hit-test, dom-overlay; overlayElement: #hud">
+
     <a-entity light="type:ambient; intensity:0.7"></a-entity>
     <a-entity light="type:directional; intensity:0.9" position="0 2 1"></a-entity>
 
-    <!-- Objeto (oculto hasta colocarlo) -->
     <a-box id="cubo" visible="false" depth="0.25" height="0.25" width="0.25"
            material="color:#FF6A00; metalness:0.2; roughness:0.6"></a-box>
 
-    <!-- Retículo + tap para colocar y anclar el cubo -->
-    <a-entity ar-hit-test="target: #cubo"></a-entity>
+    <!-- El componente hará retículo + tap para colocar si hay hit-test -->
+    <a-entity id="hittest" ar-hit-test="target: #cubo"></a-entity>
 
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    const scene = document.querySelector('a-scene');
-    document.getElementById('startAR').addEventListener('click', async () => {
+    const scene = document.getElementById('scene');
+    const btn   = document.getElementById('startAR');
+    const logEl = document.getElementById('log');
+    const log = (...m) => { logEl.textContent += m.join(' ') + '\n'; };
+
+    async function canUseImmersiveAR() {
+      if (!('xr' in navigator)) { log('navigator.xr NO existe'); return false; }
       try {
-        // En A-Frame, entrar en AR se hace con enterVR() cuando webxr mode: ar está activo
-        await scene.enterVR();
-        // Ocultamos el botón si la sesión arranca correctamente
-        document.getElementById('startAR').style.display = 'none';
+        const ok = await navigator.xr.isSessionSupported('immersive-ar');
+        log('isSessionSupported("immersive-ar") =', ok);
+        return ok;
       } catch (e) {
+        log('Error isSessionSupported:', e && e.message || e);
+        return false;
+      }
+    }
+
+    btn.addEventListener('click', async () => {
+      log('Click iniciar AR');
+      const supported = await canUseImmersiveAR();
+      if (!supported) {
+        alert('Tu navegador no reporta soporte para AR (immersive-ar). Revisa pasos debajo.');
+        return;
+      }
+      try {
+        // Con webxr="mode: ar" A-Frame usa immersive-ar internamente al hacer enterVR()
+        await scene.enterVR();
+        btn.style.display = 'none';
+        log('Sesión AR iniciada');
+      } catch (e) {
+        log('enterVR() falló:', e && e.name, e && e.message);
         alert('No se pudo iniciar AR: ' + (e && e.message ? e.message : e));
       }
     });
 
-    // Si el usuario entra con el botón nativo, también ocultamos el nuestro
     scene.addEventListener('enter-vr', () => {
       if (scene.renderer.xr.isPresenting) {
-        document.getElementById('startAR').style.display = 'none';
+        btn.style.display = 'none';
+        log('enter-vr: presentando');
       }
     });
-    // Si sale de AR, mostramos el botón otra vez
     scene.addEventListener('exit-vr', () => {
-      document.getElementById('startAR').style.display = 'block';
+      btn.style.display = 'block';
+      log('exit-vr');
     });
+
+    // Info inicial
+    log('HTTPS:', location.protocol === 'https:');
+    log('Top-level window:', window.top === window.self);
+    log('UserAgent:', navigator.userAgent);
   </script>
 </body>
 </html>
