@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WebXR AR + Hit Test (mínimo)</title>
+<title>WebXR AR + Cubo 3D</title>
 <style>
   html,body{margin:0;height:100%;background:#000}
   #btn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -26,7 +26,7 @@ let xrSession, refSpace, viewerSpace, hitTestSource;
 let currentHitPose = null;   // pose del retículo (sigue el plano)
 let placedPose     = null;   // pose anclada al tocar
 
-// ======== Minimal shader (dibujar cuadrado) ========
+// ======== Shaders (MVP + color) ========
 const VS = `
   attribute vec3 pos;
   uniform mat4 u_mvp;
@@ -40,7 +40,8 @@ const FS = `
   void main(){ gl_FragColor = u_color; }
 `;
 
-// Un cuadrado (dos triángulos) en el plano XZ, centrado en el origen
+// ======== Geometrías ========
+// Retículo: cuadrado plano en el plano XZ (dos triángulos)
 const quadVerts = new Float32Array([
   -0.15, 0.0, -0.15,
    0.15, 0.0, -0.15,
@@ -48,6 +49,26 @@ const quadVerts = new Float32Array([
   -0.15, 0.0, -0.15,
    0.15, 0.0,  0.15,
   -0.15, 0.0,  0.15
+]);
+
+// Cubo: lado 0.2 m (20 cm) centrado en origen (12 triángulos)
+const s = 0.1; // mitad del lado (0.2/2)
+const cubeVerts = new Float32Array([
+  //       X      Y      Z
+  -s, -s,  s,  s, -s,  s,  s,  s,  s, -s,  s,  s,   // +Z (frente)
+  -s, -s, -s, -s,  s, -s,  s,  s, -s,  s, -s, -s,   // -Z (detrás)
+  -s,  s, -s, -s,  s,  s,  s,  s,  s,  s,  s, -s,   // +Y (arriba)
+  -s, -s, -s,  s, -s, -s,  s, -s,  s, -s, -s,  s,   // -Y (abajo)
+   s, -s, -s,  s,  s, -s,  s,  s,  s,  s, -s,  s,   // +X (derecha)
+  -s, -s, -s, -s, -s,  s, -s,  s,  s, -s,  s, -s    // -X (izquierda)
+]);
+const cubeIndices = new Uint16Array([
+  0,1,2,  0,2,3,      // frente
+  4,5,6,  4,6,7,      // detrás
+  8,9,10, 8,10,11,    // arriba
+ 12,13,14, 12,14,15,  // abajo
+ 16,17,18, 16,18,19,  // derecha
+ 20,21,22, 20,22,23   // izquierda
 ]);
 
 // ======== Matrices util ========
@@ -64,16 +85,9 @@ function matMul(a,b){ // 4x4 * 4x4
   }
   return r;
 }
-function matIdentity(){
-  const m = new Float32Array(16);
-  m[0]=m[5]=m[10]=m[15]=1;
-  return m;
-}
-function matScale(sx,sy,sz){
-  const m = matIdentity();
-  m[0]=sx; m[5]=sy; m[10]=sz;
-  return m;
-}
+function matIdentity(){ const m=new Float32Array(16); m[0]=m[5]=m[10]=m[15]=1; return m; }
+function matScale(x,y,z){ const m=matIdentity(); m[0]=x; m[5]=y; m[10]=z; return m; }
+function matTranslate(x,y,z){ const m=matIdentity(); m[12]=x; m[13]=y; m[14]=z; return m; }
 
 // ======== GL helpers ========
 function createProgram(gl, vsSrc, fsSrc){
@@ -98,7 +112,7 @@ function createProgram(gl, vsSrc, fsSrc){
   return prog;
 }
 
-let posLoc, u_mvp, u_color, vbo;
+let posLoc, u_mvp, u_color, quadVbo, cubeVbo, cubeIbo;
 
 function initGL(){
   if (gl) return;
@@ -113,9 +127,17 @@ function initGL(){
   u_mvp   = gl.getUniformLocation(program, 'u_mvp');
   u_color = gl.getUniformLocation(program, 'u_color');
 
-  vbo = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  quadVbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadVbo);
   gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+
+  cubeVbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, cubeVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, cubeVerts, gl.STATIC_DRAW);
+
+  cubeIbo = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIbo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cubeIndices, gl.STATIC_DRAW);
 }
 
 // ======== XR flow ========
@@ -126,27 +148,25 @@ async function startAR(){
   if (!supported) { alert('Este navegador no soporta AR'); return; }
 
   xrSession = await navigator.xr.requestSession('immersive-ar', {
-    optionalFeatures: ['local-floor','hit-test'] // hit-test opcional (no bloquea sesión)
+    optionalFeatures: ['local-floor','hit-test'] // hit-test opcional
   });
 
   initGL();
   await gl.makeXRCompatible?.();
   xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
 
-  // Referencias necesarias
   refSpace    = await xrSession.requestReferenceSpace('local');
   viewerSpace = await xrSession.requestReferenceSpace('viewer');
 
-  // Fuente de hit-test (rayo desde la vista del usuario)
   hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
 
-  // "Tap" para colocar
+  // Tap para anclar el cubo 3D
   xrSession.addEventListener('select', ()=>{
     if (currentHitPose){
-      // Guardamos la pose actual como colocada
-      placedPose = {
-        matrix: currentHitPose.transform.matrix.slice()
-      };
+      // Guardamos la pose del plano y elevamos media altura del cubo (s) para que no “se hunda”
+      const base = currentHitPose.transform.matrix;
+      const lift = matTranslate(0, s, 0);
+      placedPose = { matrix: matMul(base, lift) };
     }
   });
 
@@ -162,7 +182,7 @@ function onXRFrame(t, frame){
   const pose = frame.getViewerPose(refSpace);
   if (!pose) return;
 
-  // Intentamos hacer hit test (si está disponible)
+  // Actualizamos retículo
   currentHitPose = null;
   if (hitTestSource){
     const hits = frame.getHitTestResults(hitTestSource);
@@ -173,41 +193,42 @@ function onXRFrame(t, frame){
 
   const glLayer = session.renderState.baseLayer;
   gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
-  gl.clearColor(0,0,0,0); // alpha 0 → se ve el mundo real
+  gl.clearColor(0,0,0,0); // alpha 0 → cámara visible
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.enable(gl.DEPTH_TEST);
 
   gl.useProgram(program);
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.enableVertexAttribArray(posLoc);
-  gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
 
   for (const view of pose.views){
     const vp = glLayer.getViewport(view);
     gl.viewport(vp.x, vp.y, vp.width, vp.height);
 
-    // Matrices de la vista
     const proj = view.projectionMatrix;
     const viewInv = view.transform.inverse.matrix;
 
-    // 1) Dibujar retículo (gris) si hay hit
+    // 1) Retículo (gris) pegado al plano
     if (currentHitPose){
-      const model = currentHitPose.transform.matrix; // ya orientado al plano
-      const scale = matScale(1.0, 1.0, 1.0);         // tamaño del retículo (ajusta si quieres)
-      const mvp   = matMul(proj, matMul(viewInv, matMul(model, scale)));
+      const model = currentHitPose.transform.matrix;
+      const mvp   = matMul(proj, matMul(viewInv, model));
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVbo);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
       gl.uniformMatrix4fv(u_mvp, false, mvp);
       gl.uniform4f(u_color, 0.6, 0.6, 0.6, 0.8);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
-    // 2) Dibujar "cubo plano" colocado (naranja) si ya tocaste
+    // 2) Cubo 3D (naranja) en la pose anclada
     if (placedPose){
+      // Model = placedPose * (escala opcional 1x)  (ya lo elevamos medio cubo en el select)
       const model = placedPose.matrix;
-      const scale = matScale(1.0, 1.0, 1.0);
-      const mvp   = matMul(proj, matMul(viewInv, matMul(model, scale)));
+      const mvp   = matMul(proj, matMul(viewInv, model));
+      gl.bindBuffer(gl.ARRAY_BUFFER, cubeVbo);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIbo);
       gl.uniformMatrix4fv(u_mvp, false, mvp);
-      gl.uniform4f(u_color, 1.0, 0.42, 0.0, 0.9); // naranja
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.uniform4f(u_color, 1.0, 0.42, 0.0, 0.95); // naranja
+      gl.drawElements(gl.TRIANGLES, cubeIndices.length, gl.UNSIGNED_SHORT, 0);
     }
   }
 }
