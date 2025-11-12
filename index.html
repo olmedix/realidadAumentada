@@ -35,7 +35,7 @@
 
     <!-- 👇 CUBO FIJO: 0.75 m de alto, 1 m delante del origen inicial -->
     <a-box id="cubo"
-           position="0 -2 -1"
+           position="0 0 -1"
            depth="0.2" height="0.2" width="0.2"
            material="color:#FF6A00; metalness:0.2; roughness:0.6">
     </a-box>
@@ -49,10 +49,8 @@
 
     // Pedimos la sesión AR directamente para evitar que entre en VR
     async function startAR(){
-      if (!('xr' in navigator)) { alert('navigator.xr no disponible'); return; }
       const ok = await navigator.xr.isSessionSupported('immersive-ar');
-      if (!ok) { alert('Este navegador no soporta immersive-ar'); return; }
-
+     
       const session = await navigator.xr.requestSession('immersive-ar', {
         optionalFeatures: ['local-floor'] // referencia con altura del suelo si está disponible
       });
