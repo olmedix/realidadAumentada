@@ -3,11 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AR simple con A-Frame (forzado AR)</title>
+  <title>AR simple con A-Frame (sin loading)</title>
 
-  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-  <!-- Hit Test para colocar con un toque -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-ar-hit-test-component@1.3.0/dist/aframe-ar-hit-test-component.min.js"></script>
 
   <style>
@@ -37,19 +35,18 @@
     renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true; alpha:true"
     webxr="mode: ar; optionalFeatures: hit-test, local-floor"
     vr-mode-ui="enabled: false"
-    xr-mode-ui="enabled: false">
+    xr-mode-ui="enabled: false"
+    loading-screen="enabled: false">  <!-- 👈 quita los 3 puntitos -->
 
-    <!-- Luces -->
     <a-entity light="type:ambient; intensity:0.7"></a-entity>
     <a-entity light="type:directional; intensity:0.9" position="0 2 1"></a-entity>
 
-    <!-- Objeto: cubo de 20 cm (oculto hasta colocar) -->
     <a-box id="cubo" visible="false"
            depth="0.2" height="0.2" width="0.2"
            material="color:#FF6A00; metalness:0.2; roughness:0.6">
     </a-box>
 
-    <!-- Retículo + placement con un toque -->
+    <!-- Retículo + colocación con un toque -->
     <a-entity ar-hit-test="target: #cubo"></a-entity>
 
     <a-entity camera></a-entity>
@@ -61,27 +58,17 @@
     const recolocarBtn = document.getElementById('recolocar');
     const cubo = document.getElementById('cubo');
 
-    // ✅ Pide immersive-ar directamente y conecta la sesión al renderer de A-Frame
+    // Pedimos la sesión AR directamente (evita fallback a VR)
     async function startARSession() {
-      if (!('xr' in navigator)) {
-        alert('Tu navegador no expone navigator.xr');
-        return;
-      }
-      const supported = await navigator.xr.isSessionSupported('immersive-ar');
-      if (!supported) {
-        alert('Este navegador/entorno no soporta AR (immersive-ar). Revisa que no esté en "Sitio de escritorio" y que ARCore esté actualizado.');
-        return;
-      }
+      if (!('xr' in navigator)) { alert('navigator.xr no disponible'); return; }
+      const ok = await navigator.xr.isSessionSupported('immersive-ar');
+      if (!ok) { alert('Este navegador no soporta AR (immersive-ar).'); return; }
       const session = await navigator.xr.requestSession('immersive-ar', {
         optionalFeatures: ['hit-test','local-floor']
       });
-
-      // A-Frame: enlaza la sesión XR manualmente
       const gl = scene.renderer.getContext();
-      if (gl.makeXRCompatible) { await gl.makeXRCompatible(); }
+      if (gl.makeXRCompatible) await gl.makeXRCompatible();
       scene.renderer.xr.setSession(session);
-
-      // UI
       startBtn.style.display = 'none';
       session.addEventListener('end', () => {
         startBtn.style.display = 'inline-block';
@@ -94,14 +81,13 @@
       startARSession().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
     });
 
-    // Mostrar botón “Recolocar” cuando el cubo se haya colocado
+    // Muestra "Recolocar" cuando el cubo ya está puesto
     cubo.addEventListener('componentchanged', (e) => {
       if (e.detail.name === 'visible' && cubo.getAttribute('visible')) {
         recolocarBtn.style.display = 'inline-block';
       }
     });
-
-    // Recolocar: ocultamos el cubo para que el siguiente toque lo ubique de nuevo
+    // Recolocar: oculta el cubo para que el próximo toque lo vuelva a ubicar
     recolocarBtn.addEventListener('click', () => {
       cubo.setAttribute('visible', false);
       recolocarBtn.style.display = 'none';
