@@ -26,11 +26,8 @@
   </style>
 </head>
 <body>
-  <!-- ✅ Nueva imagen del retículo -->
-  <img id="ret-img"
-       src="./reticle.svg"
-       alt="retículo"
-       style="display:none">
+  <!-- Si usas tu propia imagen, asegúrate de que /reticle.svg EXISTE en el servidor -->
+  <img id="ret-img" src="./reticle.svg" alt="retículo" style="display:none">
 
   <div id="hint">Mueve el móvil para encontrar la mesa…</div>
   <button id="start">Iniciar AR</button>
@@ -43,7 +40,9 @@
     webxr="mode: ar"
     vr-mode-ui="enabled: false"
     xr-mode-ui="enabled: false"
-    loading-screen="enabled:false">
+    loading-screen="enabled:false"
+    <!-- 👇 PONEMOS EL HIT-TEST AQUÍ -->
+    ar-hit-test="target:#cubo; src:#ret-img; type: map; mapSize:0.35 0.35">
 
     <a-entity light="type:ambient; intensity:0.8"></a-entity>
     <a-entity light="type:directional; intensity:1.0" position="0 2 1"></a-entity>
@@ -52,14 +51,9 @@
            depth="0.2" height="0.2" width="0.2"
            material="color:#FF6A00; metalness:0.2; roughness:0.6"></a-box>
 
-    <!-- ✅ Retículo grande con nueva imagen -->
-    <a-entity id="hittest"
-              ar-hit-test="target:#cubo; src:#ret-img; type:map; mapSize:0.35 0.35">
-    </a-entity>
-
     <a-entity camera></a-entity>
   </a-scene>
-<!--
+
   <script>
     const scene = document.getElementById('scene');
     const startBtn = document.getElementById('start');
@@ -79,7 +73,7 @@
       const gl = scene.renderer.getContext();
       if (gl.makeXRCompatible) await gl.makeXRCompatible();
       scene.renderer.xr.setSession(session);
-      scene.emit('enter-vr');  // activa el componente hit-test
+      scene.emit('enter-vr'); // activa ar-hit-test
 
       startBtn.style.display = 'none';
       session.addEventListener('end', () => {
@@ -90,6 +84,7 @@
         hint.textContent = 'Mueve el móvil para encontrar la mesa…';
       });
 
+      // Logs útiles
       scene.addEventListener('ar-hit-test-start', ()=>{ hint.textContent = 'Buscando superficie…'; });
       scene.addEventListener('ar-hit-test-achieved', ()=>{ hint.textContent = 'Superficie detectada. Toca para colocar.'; });
       scene.addEventListener('ar-hit-test-select', ()=>{ hint.textContent = 'Colocado. Pulsa “Recolocar” para moverlo.'; });
@@ -111,6 +106,5 @@
       hint.textContent = 'Superficie detectada. Toca para colocar.';
     });
   </script>
-  -->
 </body>
 </html>
