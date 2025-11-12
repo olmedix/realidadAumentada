@@ -26,80 +26,85 @@
   </style>
 </head>
 <body>
-  <!-- imagen para el retículo (anillo) -->
-  <img id="ret-img" src="https://raw.githubusercontent.com/aframevr/aframe/master/docs/components/images/reticle-gray.png" alt="" style="display:none">
+  <!-- ✅ Nueva imagen del retículo -->
+  <img id="ret-img"
+       src="https://cdn.jsdelivr.net/gh/aframevr/assets@master/images/reticle.png"
+       alt="retículo"
+       style="display:none">
 
   <div id="hint">Mueve el móvil para encontrar la mesa…</div>
   <button id="start">Iniciar AR</button>
   <button id="recolocar">Recolocar</button>
 
   <a-scene
+    id="scene"
     embedded
     renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true; alpha:true"
-    webxr="mode: ar; optionalFeatures: hit-test, local-floor"
+    webxr="mode: ar"
     vr-mode-ui="enabled: false"
     xr-mode-ui="enabled: false"
-    loading-screen="enabled:false"
-    ar-hit-test="target:#cubo; src:#ret-img; type: map; mapSize: 0.28 0.28">
+    loading-screen="enabled:false">
 
-    <!-- Luces -->
     <a-entity light="type:ambient; intensity:0.8"></a-entity>
     <a-entity light="type:directional; intensity:1.0" position="0 2 1"></a-entity>
 
-    <!-- El objeto (oculto hasta colocar) -->
     <a-box id="cubo" visible="false"
            depth="0.2" height="0.2" width="0.2"
-           material="color:#FF6A00; metalness:0.2; roughness:0.6">
-    </a-box>
+           material="color:#FF6A00; metalness:0.2; roughness:0.6"></a-box>
+
+    <!-- ✅ Retículo grande con nueva imagen -->
+    <a-entity id="hittest"
+              ar-hit-test="target:#cubo; src:#ret-img; type:map; mapSize:0.35 0.35">
+    </a-entity>
 
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    const scene = document.querySelector('a-scene');
+    const scene = document.getElementById('scene');
     const startBtn = document.getElementById('start');
     const recolocarBtn = document.getElementById('recolocar');
     const cubo = document.getElementById('cubo');
     const hint = document.getElementById('hint');
 
-    // Pedir la sesión AR DIRECTAMENTE (evita VR)
-    async function startARSession() {
+    async function startAR(){
       if (!('xr' in navigator)) { alert('navigator.xr no disponible'); return; }
       const ok = await navigator.xr.isSessionSupported('immersive-ar');
-      if (!ok) { alert('Este navegador no soporta AR (immersive-ar).'); return; }
+      if (!ok) { alert('Tu navegador no soporta immersive-ar'); return; }
+
       const session = await navigator.xr.requestSession('immersive-ar', {
-        optionalFeatures: ['hit-test','local-floor']
+        requiredFeatures: ['hit-test','local-floor']
       });
+
       const gl = scene.renderer.getContext();
       if (gl.makeXRCompatible) await gl.makeXRCompatible();
       scene.renderer.xr.setSession(session);
+      scene.emit('enter-vr');  // activa el componente hit-test
+
       startBtn.style.display = 'none';
-
-      // Logs visuales para saber si hay plano
-      scene.addEventListener('ar-hit-test-start', ()=>{ hint.textContent = 'Buscando superficie…'; });
-      scene.addEventListener('ar-hit-test-achieved', ()=>{ hint.textContent = 'Superficie detectada. Toca para colocar.'; });
-      scene.addEventListener('ar-hit-test-select', ()=>{ hint.textContent = 'Colocado. Pulsa “Recolocar” para moverlo.'; });
-
       session.addEventListener('end', () => {
+        scene.emit('exit-vr');
         startBtn.style.display = 'inline-block';
         recolocarBtn.style.display = 'none';
         cubo.setAttribute('visible', false);
         hint.textContent = 'Mueve el móvil para encontrar la mesa…';
       });
+
+      scene.addEventListener('ar-hit-test-start', ()=>{ hint.textContent = 'Buscando superficie…'; });
+      scene.addEventListener('ar-hit-test-achieved', ()=>{ hint.textContent = 'Superficie detectada. Toca para colocar.'; });
+      scene.addEventListener('ar-hit-test-select', ()=>{ hint.textContent = 'Colocado. Pulsa “Recolocar” para moverlo.'; });
     }
 
     startBtn.addEventListener('click', () => {
-      startARSession().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
+      startAR().catch(e => alert('No se pudo iniciar AR: ' + (e?.message || e)));
     });
 
-    // Mostrar “Recolocar” cuando el objeto pase a visible (ya colocado)
     cubo.addEventListener('componentchanged', (e) => {
       if (e.detail.name === 'visible' && cubo.getAttribute('visible')) {
         recolocarBtn.style.display = 'inline-block';
       }
     });
 
-    // Recolocar: ocultamos el cubo, el próximo toque lo reubica
     recolocarBtn.addEventListener('click', () => {
       cubo.setAttribute('visible', false);
       recolocarBtn.style.display = 'none';
