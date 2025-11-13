@@ -1,36 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
   <head>
-    <meta charset="utf-8">
-    <title>AR con Movimiento por Acelerómetro</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <meta charset="utf-8" />
+    <title>AR con marcador y distancia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 
-    <!-- AR.js para A-Frame -->
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <!-- AR.js para A-Frame (compatible HTTPS en móvil) -->
     <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.4/aframe/build/aframe-ar.js"></script>
+
     <script>
       AFRAME.registerComponent("scale-by-distance", {
+        init: function () {
+          // Vectores temporales para no crear basura cada frame
+          this.camWorldPos = new THREE.Vector3();
+          this.objWorldPos = new THREE.Vector3();
+        },
         tick: function () {
           const cam = document.querySelector("[camera]");
           const obj = this.el;
 
-          const camPos = cam.object3D.position;
-          const objPos = obj.object3D.position;
+          // Posición de cámara y objeto en coordenadas de mundo
+          cam.object3D.getWorldPosition(this.camWorldPos);
+          obj.object3D.getWorldPosition(this.objWorldPos);
 
-          const dist = camPos.distanceTo(objPos);
+          const dist = this.camWorldPos.distanceTo(this.objWorldPos);
 
-          // A menor distancia, más grande (limitamos un poco)
-          const scale = Math.max(0.2, 2 / dist);
+          // Evitar NaN o valores absurdos
+          if (!dist || dist === Infinity) return;
+
+          // A menor distancia -> más grande (ajusta estos valores a tu gusto)
+          const scale = Math.max(0.2, Math.min(3, 2 / dist));
           obj.object3D.scale.set(scale, scale, scale);
         }
       });
     </script>
   </head>
-  <body>
-  
-    <a-scene>
-     
-<a-marker preset="hiro">
+
+  <body style="margin:0; overflow:hidden;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      renderer="logarithmicDepthBuffer: true;"
+      arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
+    >
+      <!-- Marcador Hiro -->
+      <a-marker preset="hiro">
+        <!-- Nuestro cuadrado que cambia de tamaño -->
         <a-box
           position="0 0.5 0"
           color="tomato"
@@ -39,9 +57,6 @@
       </a-marker>
 
       <a-entity camera></a-entity>
-
-     
     </a-scene>
-
   </body>
 </html>
