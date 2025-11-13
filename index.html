@@ -3,20 +3,53 @@
   <head>
     <meta charset="utf-8" />
     <title>AR con marcador y distancia</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
     <!-- AR.js para A-Frame (compatible HTTPS en móvil) -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+
+    <script>
+      // Componente que escala el objeto según la distancia a la cámara
+      AFRAME.registerComponent("scale-by-distance", {
+        init: function () {
+          this.camWorldPos = new THREE.Vector3();
+          this.objWorldPos = new THREE.Vector3();
+        },
+        tick: function () {
+          const cam = document.querySelector("[camera]");
+          const obj = this.el;
+
+          // Posición de cámara y objeto en coordenadas de mundo
+          cam.object3D.getWorldPosition(this.camWorldPos);
+          obj.object3D.getWorldPosition(this.objWorldPos);
+
+          const dist = this.camWorldPos.distanceTo(this.objWorldPos);
+          if (!dist || dist === Infinity) return;
+
+          // 🔧 Ajusta esta fórmula como quieras:
+          // A menor distancia → más grande.
+          let scale = 2 / dist;
+
+          // Limitar tamaño mínimo y máximo
+          scale = Math.max(0.3, Math.min(3, scale));
+
+          obj.object3D.scale.set(scale, scale, scale);
+        }
+      });
+    </script>
   </head>
 
   <body style="margin: 0; overflow: hidden">
-    <a-scene arjs>
-      
+    <a-scene
+      arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
+      vr-mode-ui="enabled: false"
+      embedded
+    >
       <a-marker preset="hiro">
-        <a-box position="0 0.5 0" color="red" scale-by-distance></a-box>
+        <a-box position="0 0 0" color="red" scale-by-distance></a-box>
       </a-marker>
 
       <a-entity camera position="0 0.5 0"></a-entity>
