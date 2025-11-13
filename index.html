@@ -1,399 +1,46 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <title>AR con Movimiento por Acelerómetro</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <style>
-      body { margin: 0; overflow: hidden; }
-      
-      /* Botón para solicitar permisos iOS */
-      #permission-btn {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: 20px 40px;
-        font-size: 18px;
-        background: #FF6B6B;
-        color: white;
-        border: none;
-        border-radius: 10px;
-        cursor: pointer;
-        z-index: 1000;
-        display: none;
-      }
-      
-      #permission-btn:hover {
-        background: #FF5252;
-      }
-      
-      /* Panel de debug */
-      #debug-panel {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 15px;
-        font-family: monospace;
-        font-size: 12px;
-        border-radius: 5px;
-        z-index: 999;
-        max-width: 300px;
-      }
-      
-      .debug-value {
-        margin: 5px 0;
-      }
-      
-      .debug-bar {
-        height: 20px;
-        background: #333;
-        border-radius: 3px;
-        margin: 3px 0;
-        position: relative;
-        overflow: hidden;
-      }
-      
-      .debug-bar-fill {
-        height: 100%;
-        background: #4CC3D9;
-        transition: width 0.1s;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Botón de permisos (solo visible en iOS) -->
-    <button id="permission-btn">Activar Sensores</button>
-    
-    <!-- Panel de debug -->
-    <div id="debug-panel">
-      <div style="font-weight: bold; margin-bottom: 10px;">📱 Sensores de Movimiento</div>
-      <div class="debug-value">Posición Z: <span id="pos-z">0.00</span>m</div>
-      <div class="debug-value">Posición X: <span id="pos-x">0.00</span>m</div>
-      <div class="debug-value">Velocidad: <span id="velocity">0.00</span>m/s</div>
-      <div class="debug-value">Aceleración:</div>
-      <div class="debug-bar">
-        <div class="debug-bar-fill" id="accel-bar" style="width: 50%;"></div>
-      </div>
-      <div class="debug-value" style="margin-top: 10px;">
-        Estado: <span id="status" style="color: #4CC3D9;">Esperando...</span>
-      </div>
-    </div>
-
-    <!-- Video de cámara (oculto) -->
-    <video id="cam" autoplay muted playsinline style="display: none;"></video>
-
-    <a-scene>
-      <!-- Cuadrícula de referencia en el suelo -->
-      <a-plane rotation="-90 0 0"
-               width="50" height="50"
-               position="0 0 0"
-               color="#1a1a1a"
-               material="shader: flat; wireframe: true; wireframeLinewidth: 2">
-      </a-plane>
-
-      <!-- Objetos de referencia para ver el movimiento -->
-      <a-box position="0 1 -5" color="#FF6B6B" shadow="cast: true;" 
-             animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
-      </a-box>
-      
-      <a-sphere position="3 1 -5" radius="0.5" color="#4CC3D9"></a-sphere>
-      <a-sphere position="-3 1 -5" radius="0.5" color="#FFC65D"></a-sphere>
-      
-      <a-box position="0 1 -10" color="#00FF00" width="2" height="2" depth="2"></a-box>
-      <a-box position="5 1 -8" color="#FF00FF"></a-box>
-      <a-box position="-5 1 -8" color="#00FFFF"></a-box>
-
-      <!-- Luz direccional -->
-      <a-light type="directional" intensity="0.6" position="2 4 2" shadow="cast: true;"></a-light>
-      <a-light type="ambient" intensity="0.4"></a-light>
-
-      <!-- Suelo con sombras -->
-      <a-plane rotation="-90 0 0"
-               width="100" height="100"
-               color="#2a2a2a"
-               material="shader: standard"
-               shadow="receive: true">
-      </a-plane>
-
-      <!-- RIG con movimiento por acelerómetro -->
-      <a-entity id="rig"
-                position="0 1.6 0"
-                mobile-movement>
-
-        <!-- Cámara con video de fondo -->
-        <a-entity camera look-controls="pointerLockEnabled: false; touchEnabled: true">
-          <!-- Cursor opcional -->
-          <a-cursor></a-cursor>
-
-          <!-- Plano-video pegado al visor -->
-          <a-plane id="video-plane"
-                   position="0 0 -5"
-                   width="15" height="13"
-                   material="shader: flat; src: #cam; transparent: true; opacity: 0.8">
-          </a-plane>
-        </a-entity>
-      </a-entity>
-    </a-scene>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.4/aframe/build/aframe-ar.js"></script>
 
     <script>
-      // ========================================
-      // COMPONENTE DE MOVIMIENTO POR ACELERÓMETRO
-      // ========================================
-      AFRAME.registerComponent('mobile-movement', {
-        schema: {
-          acceleration: { type: 'number', default: 0.15 },
-          friction: { type: 'number', default: 0.92 },
-          maxSpeed: { type: 'number', default: 5 },
-          smoothing: { type: 'number', default: 0.8 },
-          threshold: { type: 'number', default: 0.3 }
-        },
+      AFRAME.registerComponent("scale-by-distance", {
+        tick: function () {
+          const cam = document.querySelector("[camera]");
+          const obj = this.el;
 
-        init: function() {
-          // Vectores de física
-          this.velocity = new THREE.Vector3(0, 0, 0);
-          this.acceleration = new THREE.Vector3(0, 0, 0);
-          this.smoothedAccel = new THREE.Vector3(0, 0, 0);
-          
-          // Variables de estado
-          this.hasPermission = false;
-          this.isMoving = false;
-          this.deviceOrientation = new THREE.Euler();
-          
-          // Referencias a elementos UI
-          this.debugPosZ = document.getElementById('pos-z');
-          this.debugPosX = document.getElementById('pos-x');
-          this.debugVelocity = document.getElementById('velocity');
-          this.debugAccelBar = document.getElementById('accel-bar');
-          this.debugStatus = document.getElementById('status');
-          
-          // Solicitar permisos
-          this.requestPermissions();
-        },
+          // Distancia cámara -> objeto
+          const camPos = cam.object3D.position;
+          const objPos = obj.object3D.position;
 
-        requestPermissions: function() {
-          const btn = document.getElementById('permission-btn');
-          
-          // Verificar si necesitamos solicitar permisos (iOS 13+)
-          if (typeof DeviceMotionEvent !== 'undefined' && 
-              typeof DeviceMotionEvent.requestPermission === 'function') {
-            
-            btn.style.display = 'block';
-            this.debugStatus.textContent = 'Toca el botón para activar';
-            this.debugStatus.style.color = '#FFC65D';
-            
-            btn.addEventListener('click', () => {
-              DeviceMotionEvent.requestPermission()
-                .then(response => {
-                  if (response === 'granted') {
-                    this.startSensors();
-                    btn.style.display = 'none';
-                  } else {
-                    alert('Permisos denegados. Necesitas activar los sensores de movimiento.');
-                  }
-                })
-                .catch(error => {
-                  console.error('Error solicitando permisos:', error);
-                  alert('Error: ' + error.message);
-                });
-            });
-          } else {
-            // Android o navegador compatible
-            this.startSensors();
-          }
-        },
+          const dist = camPos.distanceTo(objPos);
 
-        startSensors: function() {
-          this.hasPermission = true;
-          this.debugStatus.textContent = 'Activo ✓';
-          this.debugStatus.style.color = '#00FF00';
-          
-          // Listener de aceleración (movimiento lineal)
-          window.addEventListener('devicemotion', (event) => {
-            if (event.acceleration) {
-              const threshold = this.data.threshold;
-              
-              // Leer aceleración (m/s²)
-              let ax = event.acceleration.x || 0;
-              let ay = event.acceleration.y || 0;
-              let az = event.acceleration.z || 0;
-              
-              // Filtrar ruido (umbral)
-              ax = Math.abs(ax) > threshold ? ax : 0;
-              ay = Math.abs(ay) > threshold ? ay : 0;
-              az = Math.abs(az) > threshold ? az : 0;
-              
-              // Invertir ejes según orientación del dispositivo
-              // (ajustar según cómo sostengas el móvil)
-              this.acceleration.set(-ax, ay, az);
-              
-              this.isMoving = (Math.abs(ax) + Math.abs(ay) + Math.abs(az)) > threshold;
-            }
-          }, true);
-
-          // Listener de orientación (rotación del dispositivo)
-          window.addEventListener('deviceorientation', (event) => {
-            // Obtener ángulos Euler del dispositivo
-            const alpha = THREE.MathUtils.degToRad(event.alpha || 0); // Z
-            const beta = THREE.MathUtils.degToRad(event.beta || 0);   // X
-            const gamma = THREE.MathUtils.degToRad(event.gamma || 0); // Y
-            
-            this.deviceOrientation.set(beta, alpha, -gamma, 'YXZ');
-          }, true);
-          
-          console.log('✓ Sensores de movimiento activados');
-        },
-
-        tick: function(time, timeDelta) {
-          if (!this.hasPermission) return;
-          
-          const delta = timeDelta / 1000; // Convertir a segundos
-          if (delta > 0.1) return; // Ignorar deltas muy grandes
-          
-          // Aplicar suavizado a la aceleración
-          this.smoothedAccel.lerp(this.acceleration, this.data.smoothing);
-          
-          // Obtener la rotación de la cámara (hacia dónde mira)
-          const camera = this.el.querySelector('[camera]');
-          const cameraRotation = camera ? camera.object3D.rotation : new THREE.Euler();
-          
-          // Crear matriz de rotación basada en la orientación de la cámara
-          const quaternion = new THREE.Quaternion();
-          quaternion.setFromEuler(cameraRotation);
-          
-          // Transformar la aceleración al espacio de la cámara
-          const worldAccel = this.smoothedAccel.clone();
-          worldAccel.applyQuaternion(quaternion);
-          
-          // Integrar: aceleración -> velocidad
-          this.velocity.x += worldAccel.x * this.data.acceleration * delta;
-          this.velocity.z += worldAccel.z * this.data.acceleration * delta;
-          // No movemos en Y (arriba/abajo) para mantener altura constante
-          
-          // Aplicar fricción
-          this.velocity.multiplyScalar(this.data.friction);
-          
-          // Limitar velocidad máxima
-          const speed = this.velocity.length();
-          if (speed > this.data.maxSpeed) {
-            this.velocity.normalize().multiplyScalar(this.data.maxSpeed);
-          }
-          
-          // Integrar: velocidad -> posición
-          const pos = this.el.object3D.position;
-          pos.x += this.velocity.x * delta;
-          pos.z += this.velocity.z * delta;
-          
-          // Opcional: limitar área de movimiento
-          const maxDistance = 20;
-          pos.x = THREE.MathUtils.clamp(pos.x, -maxDistance, maxDistance);
-          pos.z = THREE.MathUtils.clamp(pos.z, -maxDistance, maxDistance);
-          
-          // Actualizar UI de debug
-          this.updateDebugUI(pos, speed);
-        },
-
-        updateDebugUI: function(pos, speed) {
-          // Actualizar valores
-          this.debugPosZ.textContent = pos.z.toFixed(2);
-          this.debugPosX.textContent = pos.x.toFixed(2);
-          this.debugVelocity.textContent = speed.toFixed(2);
-          
-          // Actualizar barra de aceleración (0-100%)
-          const accelMagnitude = this.smoothedAccel.length();
-          const percentage = Math.min(100, (accelMagnitude / 5) * 100);
-          this.debugAccelBar.style.width = percentage + '%';
-          
-          // Cambiar color según intensidad
-          if (percentage > 70) {
-            this.debugAccelBar.style.background = '#FF6B6B';
-          } else if (percentage > 30) {
-            this.debugAccelBar.style.background = '#FFC65D';
-          } else {
-            this.debugAccelBar.style.background = '#4CC3D9';
-          }
-          
-          // Estado de movimiento
-          if (this.isMoving) {
-            this.debugStatus.textContent = 'En movimiento ↔️';
-            this.debugStatus.style.color = '#00FF00';
-          } else {
-            this.debugStatus.textContent = 'Estático ⏸️';
-            this.debugStatus.style.color = '#999';
-          }
+          // A menor distancia, más grande (pero evitando infinito)
+          const scale = Math.max(0.2, 2 / dist);
+          obj.object3D.scale.set(scale, scale, scale);
         }
       });
-
-      // ========================================
-      // INICIALIZACIÓN DE CÁMARA
-      // ========================================
-      const video = document.getElementById('cam');
-
-      navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      }).then(function (stream) {
-        video.srcObject = stream;
-        video.play();
-        console.log('✓ Cámara trasera activada');
-      }).catch(function (error) {
-        console.warn("Cámara trasera no disponible, usando la frontal.", error);
-        navigator.mediaDevices.getUserMedia({ 
-          video: true 
-        }).then(function (stream) {
-          video.srcObject = stream;
-          video.play();
-          console.log('✓ Cámara frontal activada');
-        }).catch(function(err) {
-          console.error('Error accediendo a la cámara:', err);
-          alert('No se pudo acceder a la cámara');
-        });
-      });
-
-      // ========================================
-      // CONTROLES DE TECLADO (para pruebas en PC)
-      // ========================================
-      document.addEventListener('keydown', (e) => {
-        const rig = document.getElementById('rig');
-        const pos = rig.object3D.position;
-        const speed = 0.2;
-        
-        switch(e.key) {
-          case 'w':
-          case 'ArrowUp':
-            pos.z -= speed;
-            break;
-          case 's':
-          case 'ArrowDown':
-            pos.z += speed;
-            break;
-          case 'a':
-          case 'ArrowLeft':
-            pos.x -= speed;
-            break;
-          case 'd':
-          case 'ArrowRight':
-            pos.x += speed;
-            break;
-        }
-      });
-
-      // ========================================
-      // INFORMACIÓN DE INICIO
-      // ========================================
-      console.log('='.repeat(50));
-      console.log('🎮 AR con Movimiento por Acelerómetro');
-      console.log('='.repeat(50));
-      console.log('📱 Mueve tu dispositivo para desplazarte');
-      console.log('🎯 Mira alrededor arrastrando el dedo');
-      console.log('⌨️  PC: Usa WASD o flechas para moverte');
-      console.log('='.repeat(50));
     </script>
+  </head>
+
+  <body style="margin:0; overflow:hidden;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      renderer="logarithmicDepthBuffer: true;"
+      embedded
+      arjs="trackingMethod: best; sourceType: webcam;"
+    >
+
+      <a-marker preset="hiro">
+        <a-box 
+          position="0 0.5 0"
+          color="tomato"
+          scale-by-distance>
+        </a-box>
+      </a-marker>
+
+      <a-entity camera></a-entity>
+    </a-scene>
   </body>
 </html>
