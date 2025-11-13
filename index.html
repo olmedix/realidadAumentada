@@ -27,26 +27,7 @@
     </script>
   </head>
   <body>
-    <!-- Botón de permisos (solo visible en iOS) -->
-    <button id="permission-btn">Activar Sensores</button>
-    
-    <!-- Panel de debug -->
-    <div id="debug-panel">
-      <div style="font-weight: bold; margin-bottom: 10px;">📱 Sensores de Movimiento</div>
-      <div class="debug-value">Posición Z: <span id="pos-z">0.00</span>m</div>
-      <div class="debug-value">Posición X: <span id="pos-x">0.00</span>m</div>
-      <div class="debug-value">Velocidad: <span id="velocity">0.00</span>m/s</div>
-      <div class="debug-value">Aceleración:</div>
-      <div class="debug-bar">
-        <div class="debug-bar-fill" id="accel-bar" style="width: 50%;"></div>
-      </div>
-      <div class="debug-value" style="margin-top: 10px;">
-        Estado: <span id="status" style="color: #4CC3D9;">Esperando...</span>
-      </div>
-    </div>
-
-   
-
+  
     <a-scene>
      
 <a-marker preset="hiro">
