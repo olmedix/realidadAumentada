@@ -2,9 +2,12 @@
 <html lang="en">
   <head>
     <title>WebXR - Cubo rojo</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
     <style>
       body {
         font-family: Monospace;
@@ -20,7 +23,8 @@
         text-align: center;
         font-weight: bold;
         position: absolute;
-        top: 0px; width: 100%;
+        top: 0px;
+        width: 100%;
         padding: 5px;
       }
 
@@ -30,13 +34,12 @@
     </style>
   </head>
   <body>
-
     <!-- Para Magic Leap / polyfill -->
     <script src="js/three/examples/jsm/vr/HelioWebXRPolyfill.js"></script>
 
     <script type="module">
-      import * as THREE from './js/three/build/three.module.js';
-      import { WEBVR } from './js/three/examples/jsm/vr/WebVR.js';
+      import * as THREE from "./js/three/build/three.module.js";
+      import { WEBVR } from "./js/three/examples/jsm/vr/WebVR.js";
 
       // === CONFIG BÁSICA ===
       var roomSize = new THREE.Vector3(3, 3, 3);
@@ -50,25 +53,24 @@
 
       const CONTROLLER_COLLIDER_SIZE = 0.075;
 
-      function getFullscreenButton ( renderer ) {
-
-        var button = document.createElement( 'button' );
-        button.style.position = 'absolute';
-        button.style.right = '20px';
-        button.style.bottom = '20px';
-        button.style.width = '100px';
-        button.style.border = '0';
-        button.style.padding = '8px';
-        button.style.cursor = 'pointer';
-        button.style.backgroundColor = '#000';
-        button.style.color = '#fff';
-        button.style.fontFamily = 'sans-serif';
-        button.style.fontSize = '13px';
-        button.style.fontStyle = 'normal';
-        button.style.textAlign = 'center';
-        button.style.zIndex = '999';
-        button.textContent = 'FULLSCREEN';
-        button.onclick = function() {
+      function getFullscreenButton(renderer) {
+        var button = document.createElement("button");
+        button.style.position = "absolute";
+        button.style.right = "20px";
+        button.style.bottom = "20px";
+        button.style.width = "100px";
+        button.style.border = "0";
+        button.style.padding = "8px";
+        button.style.cursor = "pointer";
+        button.style.backgroundColor = "#000";
+        button.style.color = "#fff";
+        button.style.fontFamily = "sans-serif";
+        button.style.fontSize = "13px";
+        button.style.fontStyle = "normal";
+        button.style.textAlign = "center";
+        button.style.zIndex = "999";
+        button.textContent = "FULLSCREEN";
+        button.onclick = function () {
           if (renderer.domElement.requestFullscreen) {
             renderer.domElement.requestFullscreen();
           } else if (renderer.domElement.webkitRequestFullscreen) {
@@ -82,52 +84,56 @@
       }
 
       function inAR() {
-        if (!('getSession' in renderer.vr)) {
+        if (!("getSession" in renderer.vr)) {
           return false;
         }
         let session = renderer.vr.getSession();
-        return session && session.environmentBlendMode && session.environmentBlendMode != 'opaque';
+        return (
+          session &&
+          session.environmentBlendMode &&
+          session.environmentBlendMode != "opaque"
+        );
       }
 
       function init() {
-        container = document.createElement( 'div' );
-        document.body.appendChild( container );
+        container = document.createElement("div");
+        document.body.appendChild(container);
 
-        canvas = document.createElement( 'canvas' );
+        canvas = document.createElement("canvas");
 
         // Intentar WebGL2 primero
-        gl = canvas.getContext( 'webgl2', { antialias: false, xrCompatible: true } );
+        gl = canvas.getContext("webgl2", {
+          antialias: false,
+          xrCompatible: true,
+        });
         if (!gl) {
-          gl = canvas.getContext( 'experimental-webgl2', { antialias: false, xrCompatible: true } );
+          gl = canvas.getContext("experimental-webgl2", {
+            antialias: false,
+            xrCompatible: true,
+          });
         }
 
-        renderer = new THREE.WebGLRenderer( { canvas: canvas, context: gl } );
-        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, context: gl });
+        renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.sortObjects = false;
         renderer.vr.enabled = true;
-        container.appendChild( renderer.domElement );
+        container.appendChild(renderer.domElement);
 
-        document.body.appendChild( getFullscreenButton( renderer ) );
+        document.body.appendChild(getFullscreenButton(renderer));
 
         // Botones VR y AR (iguales que Toji)
-        let btnVR = WEBVR.createButton(
-          renderer,
-          {
-            mode: 'immersive-vr',
-            sessionInit: { requiredFeatures: ['local-floor'] }
-          }
-        );
-        btnVR.style.left = 'calc(50% - 110px)';
+        let btnVR = WEBVR.createButton(renderer, {
+          mode: "immersive-vr",
+          sessionInit: { requiredFeatures: ["local-floor"] },
+        });
+        btnVR.style.left = "calc(50% - 110px)";
         document.body.appendChild(btnVR);
 
-        let btnAR = WEBVR.createButton(
-          renderer,
-          {
-            mode: 'immersive-ar',
-            sessionInit: { requiredFeatures: ['local-floor'] }
-          }
-        );
-        btnAR.style.left = 'calc(50% + 10px)';
+        let btnAR = WEBVR.createButton(renderer, {
+          mode: "immersive-ar",
+          sessionInit: { requiredFeatures: ["local-floor"] },
+        });
+        btnAR.style.left = "calc(50% + 10px)";
         document.body.appendChild(btnAR);
 
         // === ESCENA BÁSICA ===
@@ -139,24 +145,35 @@
           0.01,
           roomSize.z * 10
         );
-        camera.position.y = (roomSize.y / 2) + 0.25;
+        camera.position.y = roomSize.y / 2 + 0.25;
         camera.position.z = roomSize.z * 0.2;
-        camera.lookAt( new THREE.Vector3(0, roomSize.y/2, -roomSize.z*0.25));
-        scene.add( camera );
+        camera.lookAt(new THREE.Vector3(0, roomSize.y / 2, -roomSize.z * 0.25));
+        scene.add(camera);
 
         // Controladores (pueden ser útiles en VR)
-        controller1 = renderer.vr.getController( 0 );
-        scene.add( controller1 );
+        controller1 = renderer.vr.getController(0);
+        scene.add(controller1);
 
-        controller2 = renderer.vr.getController( 1 );
-        scene.add( controller2 );
+        controller2 = renderer.vr.getController(1);
+        scene.add(controller2);
 
-        var controllerMaterial = new THREE.MeshPhongMaterial({ color: 0x00DD22 });
-        var controllerGeometry = new THREE.IcosahedronGeometry(CONTROLLER_COLLIDER_SIZE, 1);
-        controllerMesh1 = new THREE.Mesh(controllerGeometry, controllerMaterial);
-        controllerMesh2 = new THREE.Mesh(controllerGeometry, controllerMaterial);
-        controller1.add( controllerMesh1 );
-        controller2.add( controllerMesh2 );
+        var controllerMaterial = new THREE.MeshPhongMaterial({
+          color: 0x00dd22,
+        });
+        var controllerGeometry = new THREE.IcosahedronGeometry(
+          CONTROLLER_COLLIDER_SIZE,
+          1
+        );
+        controllerMesh1 = new THREE.Mesh(
+          controllerGeometry,
+          controllerMaterial
+        );
+        controllerMesh2 = new THREE.Mesh(
+          controllerGeometry,
+          controllerMaterial
+        );
+        controller1.add(controllerMesh1);
+        controller2.add(controllerMesh2);
 
         // === HABITACIÓN (para VR, se oculta en AR) ===
         var textureLoader = new THREE.TextureLoader();
@@ -168,31 +185,50 @@
           new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
           new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
           new THREE.MeshBasicMaterial({ map: ceilImage, side: THREE.BackSide }),
-          new THREE.MeshBasicMaterial({ map: floorImage, side: THREE.BackSide }),
+          new THREE.MeshBasicMaterial({
+            map: floorImage,
+            side: THREE.BackSide,
+          }),
           new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
-          new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide })
+          new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
         ];
-        var roomGeometry = new THREE.BoxGeometry( roomSize.x, roomSize.y, roomSize.z );
-        roomMesh = new THREE.Mesh( roomGeometry, roomMaterialArray );
+        var roomGeometry = new THREE.BoxGeometry(
+          roomSize.x,
+          roomSize.y,
+          roomSize.z
+        );
+        roomMesh = new THREE.Mesh(roomGeometry, roomMaterialArray);
         roomMesh.doubleSided = true;
-        roomMesh.position.y = roomSize.y/2;
-        scene.add( roomMesh );
+        roomMesh.position.y = roomSize.y / 2;
+        scene.add(roomMesh);
 
         // Cuando entramos en sesión XR, si es AR ocultamos la habitación para ver la cámara
-        renderer.vr.addEventListener('sessionstart', (ev) => {
+        renderer.vr.addEventListener("sessionstart", (ev) => {
           if (inAR()) {
-            roomMesh.visible = false;
+            // 🔴 AHORA SÍ: queremos ver la habitación también en AR,
+            // para que la cámara quede tapada por las paredes
+            roomMesh.visible = true;
+
+            // Puedes ocultar los controladores si quieres
             controllerMesh1.visible = false;
             controllerMesh2.visible = false;
           } else {
+            // Sesión VR pura (si la hubiera en otro dispositivo)
+            roomMesh.visible = true;
             controllerMesh1.visible = true;
             controllerMesh2.visible = true;
           }
         });
-        renderer.vr.addEventListener('sessionend', (ev) => {
+
+        renderer.vr.addEventListener("sessionend", (ev) => {
+          // Al salir de XR, vista normal
           roomMesh.visible = true;
           controllerMesh1.visible = false;
           controllerMesh2.visible = false;
+
+          // Posición de cámara "modo espectador"
+          camera.position.set(0, roomSize.y / 2 + 0.25, roomSize.z * 0.2);
+          camera.lookAt(new THREE.Vector3(0, roomSize.y / 2, 0));
         });
 
         // === LUCES PARA EL CUBO ===
@@ -210,17 +246,16 @@
         redCube = new THREE.Mesh(cubeGeo, cubeMat);
 
         // Lo ponemos enfrente, más o menos donde estaba el texto
-        redCube.position.set(0, roomSize.y/2, -roomSize.z * 0.25);
+        redCube.position.set(0, roomSize.y / 2, -roomSize.z * 0.25);
         scene.add(redCube);
 
-        window.addEventListener( 'resize', onWindowResize, false );
+        window.addEventListener("resize", onWindowResize, false);
       }
 
-      
       function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.setSize(window.innerWidth, window.innerHeight);
       }
 
       function render(t) {
@@ -229,11 +264,11 @@
           redCube.rotation.y += 0.01;
         }
 
-        renderer.render( scene, camera );
+        renderer.render(scene, camera);
       }
 
       init();
-      renderer.setAnimationLoop( render );
+      renderer.setAnimationLoop(render);
     </script>
   </body>
 </html>
