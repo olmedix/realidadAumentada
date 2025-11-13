@@ -664,7 +664,7 @@
         >
           <!-- Video de fondo -->
           <a-plane
-            position="0 0 -10"
+            position="0 0 -5"
             width="15"
             height="13"
             material="shader: flat; src: #cam; transparent: true; opacity: 0.6"
@@ -672,7 +672,7 @@
           >
           </a-plane>
 
-          <!-- HUD -->
+          <!-- HUD DEBUG -->
           <a-plane
             position="-0.24 0.34 -0.6"
             width="0.46"
@@ -858,6 +858,10 @@
           ></a-text>
         </a-entity>
       </a-entity>
+
+      <!-- Fin de DEBUG VR -->
+
+      <!-- Botones para entrar en modo VR o AR -->
       <canvas
         class="a-canvas a-grab-cursor"
         data-aframe-canvas="true"
@@ -893,16 +897,16 @@
       // ========================================
       AFRAME.registerComponent("rotation-aware-flow", {
         schema: {
-          speedZ: { type: "number", default: 15.0 },
-          speedX: { type: "number", default: 12.0 },
-          sensitivityZ: { type: "number", default: 25.0 },
+          speedZ: { type: "number", default: 8.0 },
+          speedX: { type: "number", default: 10.0 },
+          sensitivityZ: { type: "number", default: 15.0 },
           sensitivityX: { type: "number", default: 2.5 },
           friction: { type: "number", default: 0.82 },
           thresholdZ: { type: "number", default: 0.05 },
           thresholdX: { type: "number", default: 0.15 },
           smoothing: { type: "number", default: 0.75 },
           blockSize: { type: "number", default: 8 },
-          searchRange: { type: "number", default: 10 },
+          searchRange: { type: "number", default: 8 },
         },
 
         init: function () {
