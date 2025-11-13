@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8" />
+    <title>AR cuadrado distancia</title>
+
+    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <!-- AR.js para A-Frame -->
     <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.4/aframe/build/aframe-ar.js"></script>
 
     <script>
@@ -10,13 +16,12 @@
           const cam = document.querySelector("[camera]");
           const obj = this.el;
 
-          // Distancia cámara -> objeto
           const camPos = cam.object3D.position;
           const objPos = obj.object3D.position;
 
           const dist = camPos.distanceTo(objPos);
 
-          // A menor distancia, más grande (pero evitando infinito)
+          // A menor distancia, más grande (limitamos un poco)
           const scale = Math.max(0.2, 2 / dist);
           obj.object3D.scale.set(scale, scale, scale);
         }
@@ -27,17 +32,17 @@
   <body style="margin:0; overflow:hidden;">
     <a-scene
       vr-mode-ui="enabled: false"
-      renderer="logarithmicDepthBuffer: true;"
       embedded
-      arjs="trackingMethod: best; sourceType: webcam;"
+      renderer="logarithmicDepthBuffer: true;"
+      arjs="sourceType: webcam; facingMode: environment; debugUIEnabled: false;"
     >
-
+      <!-- Marcador Hiro -->
       <a-marker preset="hiro">
-        <a-box 
+        <a-box
           position="0 0.5 0"
           color="tomato"
-          scale-by-distance>
-        </a-box>
+          scale-by-distance
+        ></a-box>
       </a-marker>
 
       <a-entity camera></a-entity>
