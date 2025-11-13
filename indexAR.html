@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>WebXR - Cubo rojo</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+      body {
+        font-family: Monospace;
+        background-color: #000000;
+        margin: 0px;
+        overflow: hidden;
+      }
+
+      #info {
+        color: #ffffff;
+        font-family: Monospace;
+        font-size: 13px;
+        text-align: center;
+        font-weight: bold;
+        position: absolute;
+        top: 0px; width: 100%;
+        padding: 5px;
+      }
+
+      a {
+        color: #0040ff;
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- Para Magic Leap / polyfill -->
+    <script src="js/three/examples/jsm/vr/HelioWebXRPolyfill.js"></script>
+
+    <script type="module">
+      import * as THREE from './js/three/build/three.module.js';
+      import { WEBVR } from './js/three/examples/jsm/vr/WebVR.js';
+
+      // === CONFIG BÁSICA ===
+      var roomSize = new THREE.Vector3(3, 3, 3);
+
+      var container, canvas, gl;
+      var scene, camera, renderer;
+      var roomMesh;
+      var controller1, controller2;
+      var controllerMesh1, controllerMesh2;
+      var redCube;
+
+      const CONTROLLER_COLLIDER_SIZE = 0.075;
+
+      function getFullscreenButton ( renderer ) {
+
+        var button = document.createElement( 'button' );
+        button.style.position = 'absolute';
+        button.style.right = '20px';
+        button.style.bottom = '20px';
+        button.style.width = '100px';
+        button.style.border = '0';
+        button.style.padding = '8px';
+        button.style.cursor = 'pointer';
+        button.style.backgroundColor = '#000';
+        button.style.color = '#fff';
+        button.style.fontFamily = 'sans-serif';
+        button.style.fontSize = '13px';
+        button.style.fontStyle = 'normal';
+        button.style.textAlign = 'center';
+        button.style.zIndex = '999';
+        button.textContent = 'FULLSCREEN';
+        button.onclick = function() {
+          if (renderer.domElement.requestFullscreen) {
+            renderer.domElement.requestFullscreen();
+          } else if (renderer.domElement.webkitRequestFullscreen) {
+            renderer.domElement.webkitRequestFullscreen();
+          } else if (renderer.domElement.mozRequestFullScreen) {
+            renderer.domElement.mozRequestFullScreen();
+          }
+        };
+
+        return button;
+      }
+
+      function inAR() {
+        if (!('getSession' in renderer.vr)) {
+          return false;
+        }
+        let session = renderer.vr.getSession();
+        return session && session.environmentBlendMode && session.environmentBlendMode != 'opaque';
+      }
+
+      function init() {
+        container = document.createElement( 'div' );
+        document.body.appendChild( container );
+
+        canvas = document.createElement( 'canvas' );
+
+        // Intentar WebGL2 primero
+        gl = canvas.getContext( 'webgl2', { antialias: false, xrCompatible: true } );
+        if (!gl) {
+          gl = canvas.getContext( 'experimental-webgl2', { antialias: false, xrCompatible: true } );
+        }
+
+        renderer = new THREE.WebGLRenderer( { canvas: canvas, context: gl } );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.sortObjects = false;
+        renderer.vr.enabled = true;
+        container.appendChild( renderer.domElement );
+
+        document.body.appendChild( getFullscreenButton( renderer ) );
+
+        // Botones VR y AR (iguales que Toji)
+        let btnVR = WEBVR.createButton(
+          renderer,
+          {
+            mode: 'immersive-vr',
+            sessionInit: { requiredFeatures: ['local-floor'] }
+          }
+        );
+        btnVR.style.left = 'calc(50% - 110px)';
+        document.body.appendChild(btnVR);
+
+        let btnAR = WEBVR.createButton(
+          renderer,
+          {
+            mode: 'immersive-ar',
+            sessionInit: { requiredFeatures: ['local-floor'] }
+          }
+        );
+        btnAR.style.left = 'calc(50% + 10px)';
+        document.body.appendChild(btnAR);
+
+        // === ESCENA BÁSICA ===
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(
+          50,
+          window.innerWidth / window.innerHeight,
+          0.01,
+          roomSize.z * 10
+        );
+        camera.position.y = (roomSize.y / 2) + 0.25;
+        camera.position.z = roomSize.z * 0.2;
+        camera.lookAt( new THREE.Vector3(0, roomSize.y/2, -roomSize.z*0.25));
+        scene.add( camera );
+
+        // Controladores (pueden ser útiles en VR)
+        controller1 = renderer.vr.getController( 0 );
+        scene.add( controller1 );
+
+        controller2 = renderer.vr.getController( 1 );
+        scene.add( controller2 );
+
+        var controllerMaterial = new THREE.MeshPhongMaterial({ color: 0x00DD22 });
+        var controllerGeometry = new THREE.IcosahedronGeometry(CONTROLLER_COLLIDER_SIZE, 1);
+        controllerMesh1 = new THREE.Mesh(controllerGeometry, controllerMaterial);
+        controllerMesh2 = new THREE.Mesh(controllerGeometry, controllerMaterial);
+        controller1.add( controllerMesh1 );
+        controller2.add( controllerMesh2 );
+
+        // === HABITACIÓN (para VR, se oculta en AR) ===
+        var textureLoader = new THREE.TextureLoader();
+        var backImage = textureLoader.load("media/textures/Back.png");
+        var ceilImage = textureLoader.load("media/textures/Ceiling.png");
+        var floorImage = textureLoader.load("media/textures/Floor.png");
+
+        var roomMaterialArray = [
+          new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
+          new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
+          new THREE.MeshBasicMaterial({ map: ceilImage, side: THREE.BackSide }),
+          new THREE.MeshBasicMaterial({ map: floorImage, side: THREE.BackSide }),
+          new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide }),
+          new THREE.MeshBasicMaterial({ map: backImage, side: THREE.BackSide })
+        ];
+        var roomGeometry = new THREE.BoxGeometry( roomSize.x, roomSize.y, roomSize.z );
+        roomMesh = new THREE.Mesh( roomGeometry, roomMaterialArray );
+        roomMesh.doubleSided = true;
+        roomMesh.position.y = roomSize.y/2;
+        scene.add( roomMesh );
+
+        // Cuando entramos en sesión XR, si es AR ocultamos la habitación para ver la cámara
+        renderer.vr.addEventListener('sessionstart', (ev) => {
+          if (inAR()) {
+            roomMesh.visible = false;
+            controllerMesh1.visible = false;
+            controllerMesh2.visible = false;
+          } else {
+            controllerMesh1.visible = true;
+            controllerMesh2.visible = true;
+          }
+        });
+        renderer.vr.addEventListener('sessionend', (ev) => {
+          roomMesh.visible = true;
+          controllerMesh1.visible = false;
+          controllerMesh2.visible = false;
+        });
+
+        // === LUCES PARA EL CUBO ===
+        var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        hemiLight.position.set(0, 1, 0);
+        scene.add(hemiLight);
+
+        var dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(3, 5, 2);
+        scene.add(dirLight);
+
+        // === CUBO ROJO SIMPLE ===
+        var cubeGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+        var cubeMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        redCube = new THREE.Mesh(cubeGeo, cubeMat);
+
+        // Lo ponemos enfrente, más o menos donde estaba el texto
+        redCube.position.set(0, roomSize.y/2, -roomSize.z * 0.25);
+        scene.add(redCube);
+
+        window.addEventListener( 'resize', onWindowResize, false );
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+      }
+
+      function render(t) {
+        // Giramos un pelín el cubo para que se note que está vivo
+        if (redCube) {
+          redCube.rotation.y += 0.01;
+        }
+
+        renderer.render( scene, camera );
+      }
+
+      init();
+      renderer.setAnimationLoop( render );
+    </script>
+  </body>
+</html>
