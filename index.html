@@ -635,7 +635,7 @@
 
       <!-- Robot -->
       <a-entity
-        position="0 3 -3"
+        position="0 3 -4"
         scale="2 2 2"
         gltf-model="url(assets/modelo.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
@@ -903,10 +903,53 @@
           smoothing: { type: "number", default: 0.85 },
           blockSize: { type: "number", default: 8 },
           searchRange: { type: "number", default: 4 },
+          // Gyro sensor options
+          useGyro: { type: "boolean", default: true },
+          gyroThreshold: { type: "number", default: 20 }, // deg/s
+          gyroHysteresis: { type: "number", default: 2 }, // frames para activar
         },
 
         init: function () {
           console.log("🔄 Rotation-Aware Flow...");
+          // sensor-rotation helpers
+          this.sensorRotating = false;
+          this.sensorRotationCounter = 0;
+          this._gyro = null;
+          this._devicemotionHandler = null;
+          if (this.data.useGyro) {
+            // Prefer Generic Sensor API
+            try {
+              if ("Gyroscope" in window) {
+                this._gyro = new Gyroscope({ frequency: 60 });
+                this._gyro.addEventListener("reading", () => {
+                  // Gyroscope gives rad/s -> convert to deg/s
+                  const ax = Math.abs(this._gyro.x || 0) * (180 / Math.PI);
+                  const ay = Math.abs(this._gyro.y || 0) * (180 / Math.PI);
+                  const az = Math.abs(this._gyro.z || 0) * (180 / Math.PI);
+                  const ang = Math.max(ax, ay, az);
+                  if (ang > this.data.gyroThreshold)
+                    this.sensorRotationCounter = Math.min(10, this.sensorRotationCounter + 1);
+                  else this.sensorRotationCounter = Math.max(0, this.sensorRotationCounter - 1);
+                  this.sensorRotating = this.sensorRotationCounter >= this.data.gyroHysteresis;
+                });
+                this._gyro.start();
+              } else if (window.DeviceMotionEvent) {
+                // Fallback: DeviceMotionEvent.rotationRate (deg/s)
+                this._devicemotionHandler = (e) => {
+                  const rr = e.rotationRate;
+                  if (!rr) return;
+                  const a = Math.max(Math.abs(rr.alpha || 0), Math.abs(rr.beta || 0), Math.abs(rr.gamma || 0));
+                  if (a > this.data.gyroThreshold)
+                    this.sensorRotationCounter = Math.min(10, this.sensorRotationCounter + 1);
+                  else this.sensorRotationCounter = Math.max(0, this.sensorRotationCounter - 1);
+                  this.sensorRotating = this.sensorRotationCounter >= this.data.gyroHysteresis;
+                };
+                window.addEventListener("devicemotion", this._devicemotionHandler, { passive: true });
+              }
+            } catch (err) {
+              console.warn("Gyro init failed:", err);
+            }
+          }
 
           this.canvas = document.getElementById("analysis-canvas");
           this.ctx = this.canvas.getContext("2d");
@@ -996,8 +1039,8 @@
           if (this.prevFrame) {
             const flow = this.calculateFlow();
 
-            // Detectar rotación
-            this.isRotating = flow.isRotating;
+            // Detectar rotación: combinar visión + sensor
+            this.isRotating = flow.isRotating || this.sensorRotating;
 
             // Si está rotando, IGNORAR expansión
             const expansionToUse = this.isRotating ? 0 : flow.expansion;
