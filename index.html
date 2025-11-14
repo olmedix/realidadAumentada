@@ -1092,6 +1092,10 @@
           this.hud.blocksZ.setAttribute("value", "BlqZ: " + validBlocksZ);
           this.hud.blocksX.setAttribute("value", "BlqX: " + validBlocksX);
 
+          // Guardar para ajuste dinámico en tick()
+          this.lastValidBlocksZ = validBlocksZ;
+          this.lastValidBlocksX = validBlocksX;
+
           const avgExpansion = validBlocksZ >= 4 ? totalExpansion / validBlocksZ : 0;
           const avgLateral = validBlocksX >= 2 ? totalLateral / validBlocksX : 0;
           const avgLateralAbs = validBlocksX >= 2 ? totalLateralAbs / validBlocksX : 0;
@@ -1232,7 +1236,14 @@
           const targetVelX =
             effectiveX * this.data.speedX * this.data.sensitivityX;
 
-          this.velocityZ += (targetVelZ - this.velocityZ) * 0.3;
+          // ===== Ajuste dinámico para Z =====
+          // si hay muchos bloques válidos aumentamos la ganancia (más confianza -> más respuesta)
+          const blocksZ = this.lastValidBlocksZ || 0;
+          // factor entre ~0.5 (pocos bloques) y 2.5 (muchos)
+          const gainZ = Math.min(2.5, Math.max(0.5, 0.5 + blocksZ / 6));
+          const scaledTargetVelZ = targetVelZ * gainZ;
+
+          this.velocityZ += (scaledTargetVelZ - this.velocityZ) * 0.3;
           this.velocityX += (targetVelX - this.velocityX) * 0.3;
 
           this.velocityZ *= this.data.friction;
