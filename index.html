@@ -905,8 +905,8 @@
           thresholdZ: { type: "number", default: 0.08 },
           thresholdX: { type: "number", default: 0.25 },
           smoothing: { type: "number", default: 0.85 },
-          blockSize: { type: "number", default: 8 },
-          searchRange: { type: "number", default: 8 },
+          blockSize: { type: "number", default: 6 },
+          searchRange: { type: "number", default: 6 },
         },
 
         init: function () {
@@ -1036,7 +1036,7 @@
           const blockSize = this.data.blockSize;
           const searchRange = this.data.searchRange;
 
-          let totalExpansion = 0;
+          let radialContribs = [];
           let totalLateral = 0;
           let totalLateralAbs = 0;
           let totalVertical = 0;
@@ -1046,9 +1046,22 @@
 
           const stepSize = blockSize;
 
-          for (let by = blockSize; by < this.height - blockSize * 2; by += stepSize) {
-            for (let bx = blockSize; bx < this.width - blockSize * 2; bx += stepSize) {
-              const motion = this.findBlockMatch(bx, by, blockSize, searchRange);
+          for (
+            let by = blockSize;
+            by < this.height - blockSize * 2;
+            by += stepSize
+          ) {
+            for (
+              let bx = blockSize;
+              bx < this.width - blockSize * 2;
+              bx += stepSize
+            ) {
+              const motion = this.findBlockMatch(
+                bx,
+                by,
+                blockSize,
+                searchRange
+              );
 
               if (motion && motion.confidence > 0.5) {
                 const blockCenterX = bx + blockSize / 2;
@@ -1060,10 +1073,14 @@
                 if (distFromCenter > blockSize * 3) {
                   const radialX = dx / distFromCenter;
                   const radialY = dy / distFromCenter;
-                  const radialMotion = motion.dx * radialX + motion.dy * radialY;
-                  const weight = distFromCenter / Math.max(this.centerX, this.centerY);
+                  const radialMotion =
+                    motion.dx * radialX + motion.dy * radialY;
+                  const weight =
+                    distFromCenter / Math.max(this.centerX, this.centerY);
 
                   totalExpansion += radialMotion * weight;
+                  // guardar la contribución ponderada para calcular mediana
+                  radialContribs.push(radialMotion * weight);
                   validBlocksZ++;
                 }
 
@@ -1096,19 +1113,37 @@
           this.lastValidBlocksZ = validBlocksZ;
           this.lastValidBlocksX = validBlocksX;
 
-          const avgExpansion = validBlocksZ >= 4 ? totalExpansion / validBlocksZ : 0;
-          const avgLateral = validBlocksX >= 2 ? totalLateral / validBlocksX : 0;
-          const avgLateralAbs = validBlocksX >= 2 ? totalLateralAbs / validBlocksX : 0;
-          const avgVertical = totalVerticalAbs > 0 ? totalVertical / (totalVerticalAbs ? (totalVerticalAbs / Math.abs(totalVertical) * (Math.abs(totalVertical) / totalVerticalAbs)) : 1) : 0;
-          const avgVerticalAbs = totalVerticalAbs > 0 ? totalVerticalAbs / ( (this.width / blockSize) * (this.height / blockSize) ) : 0;
+          const avgExpansion =
+            validBlocksZ >= 4 ? totalExpansion / validBlocksZ : 0;
+          const avgLateral =
+            validBlocksX >= 2 ? totalLateral / validBlocksX : 0;
+          const avgLateralAbs =
+            validBlocksX >= 2 ? totalLateralAbs / validBlocksX : 0;
+          const avgVertical =
+            totalVerticalAbs > 0
+              ? totalVertical /
+                (totalVerticalAbs
+                  ? (totalVerticalAbs / Math.abs(totalVertical)) *
+                    (Math.abs(totalVertical) / totalVerticalAbs)
+                  : 1)
+              : 0;
+          const avgVerticalAbs =
+            totalVerticalAbs > 0
+              ? totalVerticalAbs /
+                ((this.width / blockSize) * (this.height / blockSize))
+              : 0;
 
           // coherencia lateral
-          const lateralCoherence = avgLateralAbs > 0 ? Math.abs(avgLateral) / avgLateralAbs : 0;
+          const lateralCoherence =
+            avgLateralAbs > 0 ? Math.abs(avgLateral) / avgLateralAbs : 0;
           // coherencia vertical
-          const verticalCoherence = avgVerticalAbs > 0 ? Math.abs(avgVertical) / (avgVerticalAbs) : 0;
+          const verticalCoherence =
+            avgVerticalAbs > 0 ? Math.abs(avgVertical) / avgVerticalAbs : 0;
 
-          const lateralRotCandidate = lateralCoherence > 0.7 && avgLateralAbs > 0.5;
-          const verticalRotCandidate = verticalCoherence > 0.7 && avgVerticalAbs > 0.5;
+          const lateralRotCandidate =
+            lateralCoherence > 0.7 && avgLateralAbs > 0.5;
+          const verticalRotCandidate =
+            verticalCoherence > 0.7 && avgVerticalAbs > 0.5;
 
           // histéresis simple: incrementar contador si candidato, decrementar si no
           if (lateralRotCandidate || verticalRotCandidate) {
@@ -1265,7 +1300,6 @@
             "value",
             "X:" + pos.x.toFixed(1) + " Z:" + pos.z.toFixed(1)
           );
-
 
           // ========== DEBUG HUD ==========
           // Barras
