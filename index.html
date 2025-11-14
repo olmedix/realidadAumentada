@@ -898,13 +898,13 @@
       AFRAME.registerComponent("rotation-aware-flow", {
         schema: {
           speedZ: { type: "number", default: 8.0 },
-          speedX: { type: "number", default: 10.0 },
+          speedX: { type: "number", default: 6.0 },
           sensitivityZ: { type: "number", default: 15.0 },
-          sensitivityX: { type: "number", default: 2.5 },
-          friction: { type: "number", default: 0.82 },
+          sensitivityX: { type: "number", default: 1 },
+          friction: { type: "number", default: 0.9 },
           thresholdZ: { type: "number", default: 0.05 },
-          thresholdX: { type: "number", default: 0.15 },
-          smoothing: { type: "number", default: 0.75 },
+          thresholdX: { type: "number", default: 0.25 },
+          smoothing: { type: "number", default: 0.85 },
           blockSize: { type: "number", default: 8 },
           searchRange: { type: "number", default: 8 },
         },
