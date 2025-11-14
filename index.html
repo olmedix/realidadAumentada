@@ -1211,6 +1211,7 @@
           const delta = Math.min(timeDelta / 1000, 0.1);
           if (delta <= 0) return;
 
+          // Umbrales antiruido
           const effectiveZ =
             Math.abs(this.smoothFlowZ) > this.data.thresholdZ
               ? this.smoothFlowZ
@@ -1239,6 +1240,7 @@
           // X: INVERTIDO para corregir dirección
           pos.x -= this.velocityX * delta;
 
+          // limites de posición de la cámara
           pos.z = THREE.MathUtils.clamp(pos.z, -50, 50);
           pos.x = THREE.MathUtils.clamp(pos.x, -50, 50);
 
@@ -1247,6 +1249,8 @@
             "X:" + pos.x.toFixed(1) + " Z:" + pos.z.toFixed(1)
           );
 
+          
+          // ========== DEBUG HUD ==========
           // Barras
           const barMax = 0.38;
           const barWidthZ = Math.min(barMax / 2, Math.abs(effectiveZ) * 5);
