@@ -637,7 +637,7 @@
       <a-entity
         id="robot"
         position="0 2.5 -2"
-        scale="1.2 1.2 1.2"
+        scale="1 1 1"
         gltf-model="url(assets/modelo.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
       >
@@ -904,12 +904,12 @@
       // ========================================
       AFRAME.registerComponent("rotation-aware-flow", {
         schema: {
-          speedZ: { type: "number", default: 6.0 },
+          speedZ: { type: "number", default: 8.0 },
           speedX: { type: "number", default: 6.0 },
           sensitivityZ: { type: "number", default: 1 },
           sensitivityX: { type: "number", default: 0.6 },
           friction: { type: "number", default: 0.95 },
-          thresholdZ: { type: "number", default: 0.08 },
+          thresholdZ: { type: "number", default: 0.09 },
           thresholdX: { type: "number", default: 0.6 },
           smoothing: { type: "number", default: 0.85 },
           lateralSmoothing: { type: "number", default: 0.95 },
