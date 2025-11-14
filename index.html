@@ -633,7 +633,15 @@
         text=""
       ></a-text>
 
-      
+      <!-- Robot -->
+      <a-entity
+        id="robot"
+        position="0 3 -2"
+        scale="1.2 1.2 1.2"
+        gltf-model="url(assets/modelo.glb)"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
+      >
+      </a-entity>
 
       <a-light
         type="directional"
@@ -651,15 +659,6 @@
           position=""
           rotation=""
         >
-
-        <!-- Robot -->
-      <a-entity
-        position="0 1 -4"
-        scale="1.2 1.2 1.2"
-        gltf-model="url(assets/modelo.glb)"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
-      >
-      </a-entity>
           <!-- Video de fondo -->
           <a-plane
             position="0 1.2 -7"
@@ -846,9 +845,19 @@
           ></a-text>
 
           <a-text
+            id="hud-robot-pos"
+            value="Robot: X:0.0 Y:0.0 Z:0.0"
+            position="-0.40 0.07 -0.59"
+            width="0.5"
+            color="#FFEE66"
+            align="left"
+            text=""
+          ></a-text>
+
+          <a-text
             id="hud-fps"
             value="FPS:27"
-            position="-0.40 0.07 -0.59"
+            position="-0.40 0.04 -0.59"
             width="0.5"
             color="#666"
             align="left"
@@ -930,9 +939,17 @@
                   const az = Math.abs(this._gyro.z || 0) * (180 / Math.PI);
                   const ang = Math.max(ax, ay, az);
                   if (ang > this.data.gyroThreshold)
-                    this.sensorRotationCounter = Math.min(10, this.sensorRotationCounter + 1);
-                  else this.sensorRotationCounter = Math.max(0, this.sensorRotationCounter - 1);
-                  this.sensorRotating = this.sensorRotationCounter >= this.data.gyroHysteresis;
+                    this.sensorRotationCounter = Math.min(
+                      10,
+                      this.sensorRotationCounter + 1
+                    );
+                  else
+                    this.sensorRotationCounter = Math.max(
+                      0,
+                      this.sensorRotationCounter - 1
+                    );
+                  this.sensorRotating =
+                    this.sensorRotationCounter >= this.data.gyroHysteresis;
                 });
                 this._gyro.start();
               } else if (window.DeviceMotionEvent) {
@@ -940,13 +957,29 @@
                 this._devicemotionHandler = (e) => {
                   const rr = e.rotationRate;
                   if (!rr) return;
-                  const a = Math.max(Math.abs(rr.alpha || 0), Math.abs(rr.beta || 0), Math.abs(rr.gamma || 0));
+                  const a = Math.max(
+                    Math.abs(rr.alpha || 0),
+                    Math.abs(rr.beta || 0),
+                    Math.abs(rr.gamma || 0)
+                  );
                   if (a > this.data.gyroThreshold)
-                    this.sensorRotationCounter = Math.min(10, this.sensorRotationCounter + 1);
-                  else this.sensorRotationCounter = Math.max(0, this.sensorRotationCounter - 1);
-                  this.sensorRotating = this.sensorRotationCounter >= this.data.gyroHysteresis;
+                    this.sensorRotationCounter = Math.min(
+                      10,
+                      this.sensorRotationCounter + 1
+                    );
+                  else
+                    this.sensorRotationCounter = Math.max(
+                      0,
+                      this.sensorRotationCounter - 1
+                    );
+                  this.sensorRotating =
+                    this.sensorRotationCounter >= this.data.gyroHysteresis;
                 };
-                window.addEventListener("devicemotion", this._devicemotionHandler, { passive: true });
+                window.addEventListener(
+                  "devicemotion",
+                  this._devicemotionHandler,
+                  { passive: true }
+                );
               }
             } catch (err) {
               console.warn("Gyro init failed:", err);
@@ -989,8 +1022,11 @@
             blocksZ: document.getElementById("hud-blocks-z"),
             blocksX: document.getElementById("hud-blocks-x"),
             pos: document.getElementById("hud-pos"),
+            robotPos: document.getElementById("hud-robot-pos"),
             fps: document.getElementById("hud-fps"),
           };
+
+          this.robotEl = document.getElementById("robot");
 
           this.video.addEventListener("loadeddata", () => {
             console.log("✓ Video OK");
@@ -1378,6 +1414,14 @@
             "value",
             "X:" + pos.x.toFixed(1) + " Z:" + pos.z.toFixed(1)
           );
+
+          if (this.robotEl && this.hud.robotPos) {
+            const r = this.robotEl.object3D.position;
+            this.hud.robotPos.setAttribute(
+              "value",
+              "Robot: X:" + r.x.toFixed(1) + " Y:" + r.y.toFixed(1) + " Z:" + r.z.toFixed(1)
+            );
+          }
 
           // ========== DEBUG HUD ==========
           // Barras
