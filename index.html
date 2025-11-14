@@ -922,8 +922,6 @@
         },
 
         init: function () {
-          console.log("🔄 Rotation-Aware Flow...");
-          // sensor-rotation helpers
           this.sensorRotating = false;
           this.sensorRotationCounter = 0;
           this._gyro = null;
@@ -1026,6 +1024,15 @@
             robotPos: document.getElementById("hud-robot-pos"),
             fps: document.getElementById("hud-fps"),
           };
+
+          // Referencia a la cámara del rig
+          this.camEl =
+            this.el.querySelector("[camera]") || this.el.sceneEl.camera.el;
+
+          // Vectores de trabajo para movimiento
+          this._forward = new THREE.Vector3();
+          this._right = new THREE.Vector3();
+          this._up = new THREE.Vector3(0, 1, 0);
 
           this.robotEl = document.getElementById("robot");
 
@@ -1412,15 +1419,42 @@
             -maxVelX,
             maxVelX
           );
-
+          /*
           const pos = this.el.object3D.position;
-
           // Z: expansión positiva = avanzar hacia objetos = Z disminuye
           pos.z -= this.velocityZ * delta;
-
           // X: INVERTIDO para corregir dirección
           pos.x -= this.velocityX * delta;
+*/
 
+          const rigObj = this.el.object3D;
+
+          // === Si estás rotando, puedes seguir como ya tienes el filtro ===
+          // (si quieres, aquí NO retornes, solo pones velocidades a 0 cuando gires fuerte)
+          if (this.isRotating) {
+            this.velocityZ = 0;
+            this.velocityX = 0;
+            // dejamos que el HUD se actualice más abajo
+          }
+
+          // Obtener dirección hacia donde mira la cámara (en mundo)
+          this.camEl.object3D.getWorldDirection(this._forward);
+          this._forward.normalize();
+
+          // Vector derecha (perpendicular a forward y up)
+          this._right.crossVectors(this._forward, this._up).normalize();
+
+          // PROFUNDIDAD: avanzar / retroceder según optical flow
+          // Ojo: si ves que va al revés, cambia el signo del factor (-1)
+          rigObj.position.addScaledVector(
+            this._forward,
+            -this.velocityZ * delta
+          );
+
+          // LATERAL: izquierda / derecha
+          rigObj.position.addScaledVector(this._right, this.velocityX * delta);
+
+          /*
           // limites de posición de la cámara
           pos.z = THREE.MathUtils.clamp(pos.z, -50, 50);
           pos.x = THREE.MathUtils.clamp(pos.x, -50, 50);
@@ -1428,6 +1462,18 @@
           this.hud.pos.setAttribute(
             "value",
             "X:" + pos.x.toFixed(1) + " Z:" + pos.z.toFixed(1)
+          );
+          */
+
+          rigObj.position.z = THREE.MathUtils.clamp(rigObj.position.z, -50, 50);
+          rigObj.position.x = THREE.MathUtils.clamp(rigObj.position.x, -50, 50);
+
+          this.hud.pos.setAttribute(
+            "value",
+            "X:" +
+              rigObj.position.x.toFixed(1) +
+              " Z:" +
+              rigObj.position.z.toFixed(1)
           );
 
           if (this.robotEl && this.hud.robotPos) {
