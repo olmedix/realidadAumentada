@@ -1278,8 +1278,14 @@
           const gainZ = Math.min(2.5, Math.max(0.5, 0.5 + blocksZ / 6));
           const scaledTargetVelZ = targetVelZ * gainZ;
 
+           // Si Z domina claramente, reducir influencia lateral
+          const zDominance = Math.abs(effectiveZ) > Math.max(0.12, Math.abs(effectiveX) * 2.5);
+          const adjustedTargetVelX = zDominance ? targetVelX * 0.25 : targetVelX;
+
           this.velocityZ += (scaledTargetVelZ - this.velocityZ) * 0.3;
-          this.velocityX += (targetVelX - this.velocityX) * 0.3;
+          this.velocityX += (adjustedTargetVelX - this.velocityX) * 0.3;
+
+          if (zDominance) this.velocityX *= 0.7;
 
           this.velocityZ *= this.data.friction;
           this.velocityX *= this.data.friction;
