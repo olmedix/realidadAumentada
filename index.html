@@ -1437,36 +1437,25 @@
             // dejamos que el HUD se actualice más abajo
           }
 
-          // Obtener dirección hacia donde mira la cámara (en mundo)
           this.camEl.object3D.getWorldDirection(this._forward);
+          this._forward.y = 0; // 👈 eliminar componente vertical
+          if (this._forward.lengthSq() < 1e-4) {
+            this._forward.set(0, 0, -1); // seguridad
+          }
           this._forward.normalize();
 
-          // Vector derecha (perpendicular a forward y up)
           this._right.crossVectors(this._forward, this._up).normalize();
 
-          // PROFUNDIDAD: avanzar / retroceder según optical flow
-          // Ojo: si ves que va al revés, cambia el signo del factor (-1)
           rigObj.position.addScaledVector(
             this._forward,
             -this.velocityZ * delta
           );
-
-          // LATERAL: izquierda / derecha
           rigObj.position.addScaledVector(this._right, this.velocityX * delta);
-
-          /*
-          // limites de posición de la cámara
-          pos.z = THREE.MathUtils.clamp(pos.z, -50, 50);
-          pos.x = THREE.MathUtils.clamp(pos.x, -50, 50);
-
-          this.hud.pos.setAttribute(
-            "value",
-            "X:" + pos.x.toFixed(1) + " Z:" + pos.z.toFixed(1)
-          );
-          */
 
           rigObj.position.z = THREE.MathUtils.clamp(rigObj.position.z, -50, 50);
           rigObj.position.x = THREE.MathUtils.clamp(rigObj.position.x, -50, 50);
+
+          rigObj.position.y = 1.6;   // 👈 mantener Y fija siempre
 
           this.hud.pos.setAttribute(
             "value",
