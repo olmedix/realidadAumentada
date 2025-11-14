@@ -907,11 +907,12 @@
           speedZ: { type: "number", default: 6.0 },
           speedX: { type: "number", default: 6.0 },
           sensitivityZ: { type: "number", default: 1 },
-          sensitivityX: { type: "number", default: 1 },
-          friction: { type: "number", default: 0.9 },
+          sensitivityX: { type: "number", default: 0.35 },
+          friction: { type: "number", default: 0.95 },
           thresholdZ: { type: "number", default: 0.08 },
-          thresholdX: { type: "number", default: 0.25 },
+          thresholdX: { type: "number", default: 0.35 },
           smoothing: { type: "number", default: 0.85 },
+          lateralSmoothing: { type: "number", default: 0.95 },
           blockSize: { type: "number", default: 8 },
           searchRange: { type: "number", default: 4 },
           // Gyro sensor options
@@ -1088,9 +1089,8 @@
               this.smoothFlowZ * this.data.smoothing +
               expansionToUse * (1 - this.data.smoothing);
             this.smoothFlowX =
-              this.smoothFlowX * this.data.smoothing +
-              flow.lateral * (1 - this.data.smoothing);
-
+              this.smoothFlowX * this.data.lateralSmoothing +
+              flow.lateral * (1 - this.data.lateralSmoothing);
             // HUD
             this.hud.depthVal.setAttribute(
               "value",
@@ -1391,12 +1391,27 @@
             : targetVelX;
 
           this.velocityZ += (scaledTargetVelZ - this.velocityZ) * 0.3;
-          this.velocityX += (adjustedTargetVelX - this.velocityX) * 0.3;
+
+          // Suavizado lateral más fuerte: deadzone, menor ganancia y clamp
+          const deadzoneX = 0.05; // ajustar: ignorar micro-movimientos en X (0.02..0.1)
+          const lateralTarget =
+            Math.abs(effectiveX) > deadzoneX ? adjustedTargetVelX : 0;
+          // menor ganancia para evitar saltos al mover lentamente el móvil
+          this.velocityX += (lateralTarget - this.velocityX) * 0.12;
 
           if (zDominance) this.velocityX *= 0.7;
 
+          // aplicar fricción
           this.velocityZ *= this.data.friction;
           this.velocityX *= this.data.friction;
+
+          // limitar cambios bruscos en X (ajustar maxVelX)
+          const maxVelX = 0.6;
+          this.velocityX = THREE.MathUtils.clamp(
+            this.velocityX,
+            -maxVelX,
+            maxVelX
+          );
 
           const pos = this.el.object3D.position;
 
@@ -1419,7 +1434,12 @@
             const r = this.robotEl.object3D.position;
             this.hud.robotPos.setAttribute(
               "value",
-              "Robot: X:" + r.x.toFixed(1) + " Y:" + r.y.toFixed(1) + " Z:" + r.z.toFixed(1)
+              "Robot: X:" +
+                r.x.toFixed(1) +
+                " Y:" +
+                r.y.toFixed(1) +
+                " Z:" +
+                r.z.toFixed(1)
             );
           }
 
