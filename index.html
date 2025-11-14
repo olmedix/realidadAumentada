@@ -931,6 +931,7 @@
           this.smoothFlowX = 0;
 
           this.isRotating = false;
+          this.rotationCounter = 0; // contador para histéresis en detección de rotación
 
           this.frameCount = 0;
           this.lastFpsTime = Date.now();
@@ -1029,89 +1030,94 @@
           requestAnimationFrame(() => this.analyzeFrame());
         },
 
-        // Recorre la imagen en bloques por cada bloque llama a findBlockMatch
+        // Recorre la imagen por bloques por cada bloque llama a findBlockMatch
         // para ver su movimiento. Luego calcula la expansión y el movimiento lateral.
         calculateFlow: function () {
-          // Tamaño del bloque y rango de búsqueda
           const blockSize = this.data.blockSize;
           const searchRange = this.data.searchRange;
 
-          // Acumuladores para señales que devolvemos
-          let totalExpansion = 0; // suma de contribuciones radiales (profundidad)
-          let totalLateral = 0; // suma de desplazamientos en X (lateral)
-          let totalLateralAbs = 0; // suma de valores absolutos para medir coherencia
-          let validBlocksZ = 0; // cuántos bloques válidos aportan a expansión
-          let validBlocksX = 0; // cuántos bloques válidos aportan a lateral
+          let totalExpansion = 0;
+          let totalLateral = 0;
+          let totalLateralAbs = 0;
+          let totalVertical = 0;
+          let totalVerticalAbs = 0;
+          let validBlocksZ = 0;
+          let validBlocksX = 0;
 
-          const stepSize = blockSize; // paso al recorrer la imagen por bloques
+          const stepSize = blockSize;
 
-          // Recorre la imagen por bloques (evita bordes)
           for (let by = blockSize; by < this.height - blockSize * 2; by += stepSize) {
             for (let bx = blockSize; bx < this.width - blockSize * 2; bx += stepSize) {
-              // intenta encontrar el mejor desplazamiento para el bloque (bx,by)
               const motion = this.findBlockMatch(bx, by, blockSize, searchRange);
 
-              // si hay un match fiable (findBlockMatch devuelve objeto con confidence)
               if (motion && motion.confidence > 0.5) {
-                // --- CÁLCULO DE EXPANSIÓN (profundidad) ---
-                // centro del bloque
                 const blockCenterX = bx + blockSize / 2;
                 const blockCenterY = by + blockSize / 2;
-                // vector desde el centro de la imagen hasta el bloque
                 const dx = blockCenterX - this.centerX;
                 const dy = blockCenterY - this.centerY;
                 const distFromCenter = Math.sqrt(dx * dx + dy * dy);
 
-                // Solo usamos bloques alejados del centro (evita ruido central)
                 if (distFromCenter > blockSize * 3) {
-                  // vector radial unitario
                   const radialX = dx / distFromCenter;
                   const radialY = dy / distFromCenter;
-
-                  // proyecta el movimiento (dx,dy) del bloque sobre la dirección radial
-                  // si el bloque "sale" del centro → expansión (indicador de acercarse/alejarse)
                   const radialMotion = motion.dx * radialX + motion.dy * radialY;
-                  // peso según la distancia al centro (bloques lejanos pesan más)
                   const weight = distFromCenter / Math.max(this.centerX, this.centerY);
 
                   totalExpansion += radialMotion * weight;
                   validBlocksZ++;
                 }
 
-                // --- CÁLCULO LATERAL (para mover izquierda/derecha y detectar rotación) ---
-                // solo consideramos una franja central vertical (center band)
                 const centerBandTop = this.height / 3;
                 const centerBandBottom = (this.height * 2) / 3;
 
                 if (by >= centerBandTop && by <= centerBandBottom) {
-                  totalLateral += motion.dx; // desplazamiento horizontal observado
+                  totalLateral += motion.dx;
                   totalLateralAbs += Math.abs(motion.dx);
                   validBlocksX++;
+                }
+
+                // acumular vertical para detectar pitch/tilt
+                // usamos bloques en franja horizontal central (puedes ajustar)
+                const middleBandLeft = this.width / 3;
+                const middleBandRight = (this.width * 2) / 3;
+                if (bx >= middleBandLeft && bx <= middleBandRight) {
+                  totalVertical += motion.dy;
+                  totalVerticalAbs += Math.abs(motion.dy);
                 }
               }
             }
           }
 
-          // Actualiza HUD con cantidad de bloques válidos
+          // HUD bloques
           this.hud.blocksZ.setAttribute("value", "BlqZ: " + validBlocksZ);
           this.hud.blocksX.setAttribute("value", "BlqX: " + validBlocksX);
 
-          // Promedios solo si hay suficientes bloques; si no, 0
           const avgExpansion = validBlocksZ >= 4 ? totalExpansion / validBlocksZ : 0;
           const avgLateral = validBlocksX >= 2 ? totalLateral / validBlocksX : 0;
           const avgLateralAbs = validBlocksX >= 2 ? totalLateralAbs / validBlocksX : 0;
+          const avgVertical = totalVerticalAbs > 0 ? totalVertical / (totalVerticalAbs ? (totalVerticalAbs / Math.abs(totalVertical) * (Math.abs(totalVertical) / totalVerticalAbs)) : 1) : 0;
+          const avgVerticalAbs = totalVerticalAbs > 0 ? totalVerticalAbs / ( (this.width / blockSize) * (this.height / blockSize) ) : 0;
 
-          // --- DETECCIÓN DE ROTACIÓN ---
-          // lateralCoherence aproxima si todos los desplazamientos laterales van en misma dirección
-          const lateralCoherence =
-            avgLateralAbs > 0 ? Math.abs(avgLateral) / avgLateralAbs : 0;
-          // consideramos rotación si hay coherencia alta y magnitud suficiente
-          const isRotating = lateralCoherence > 0.7 && avgLateralAbs > 0.5;
+          // coherencia lateral
+          const lateralCoherence = avgLateralAbs > 0 ? Math.abs(avgLateral) / avgLateralAbs : 0;
+          // coherencia vertical
+          const verticalCoherence = avgVerticalAbs > 0 ? Math.abs(avgVertical) / (avgVerticalAbs) : 0;
 
-          // Devolvemos las señales que usarán analyzeFrame y tick
+          const lateralRotCandidate = lateralCoherence > 0.7 && avgLateralAbs > 0.5;
+          const verticalRotCandidate = verticalCoherence > 0.7 && avgVerticalAbs > 0.5;
+
+          // histéresis simple: incrementar contador si candidato, decrementar si no
+          if (lateralRotCandidate || verticalRotCandidate) {
+            this.rotationCounter = Math.min(4, this.rotationCounter + 1);
+          } else {
+            this.rotationCounter = Math.max(0, this.rotationCounter - 1);
+          }
+
+          const isRotating = this.rotationCounter >= 2;
+
           return {
-            expansion: avgExpansion, // >0 = acercamiento, <0 = alejamiento (según convención)
-            lateral: avgLateral, // >0 = movimiento hacia la derecha en imagen, <0 = izquierda
+            expansion: avgExpansion,
+            lateral: avgLateral,
             isRotating: isRotating,
           };
         },
