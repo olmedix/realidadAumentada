@@ -633,14 +633,7 @@
         text=""
       ></a-text>
 
-      <!-- Robot -->
-      <a-entity
-        position="0 3 -2"
-        scale="1.2 1.2 1.2"
-        gltf-model="url(assets/modelo.glb)"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
-      >
-      </a-entity>
+      
 
       <a-light
         type="directional"
@@ -658,6 +651,15 @@
           position=""
           rotation=""
         >
+
+        <!-- Robot -->
+      <a-entity
+        position="0 3 -2"
+        scale="1.2 1.2 1.2"
+        gltf-model="url(assets/modelo.glb)"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
+      >
+      </a-entity>
           <!-- Video de fondo -->
           <a-plane
             position="0 1.2 -7"
