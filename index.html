@@ -953,7 +953,9 @@
             // Carga ASÍNCRONA 
             this.el.setAttribute("gltf-model", this.data.src);
             this.triggered = true; // para no pedirlo más veces
-          }else {
+          }
+
+          if(dz > this.data.threshold + 1) {
               this.el.removeAttribute("gltf-model");
               this.loaded = false;
               this.el.setAttribute("visible", false);
@@ -1482,13 +1484,7 @@
             -maxVelX,
             maxVelX
           );
-          /*
-          const pos = this.el.object3D.position;
-          // Z: expansión positiva = avanzar hacia objetos = Z disminuye
-          pos.z -= this.velocityZ * delta;
-          // X: INVERTIDO para corregir dirección
-          pos.x -= this.velocityX * delta;
-*/
+
 
           const rigObj = this.el.object3D;
 
