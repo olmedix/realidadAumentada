@@ -650,7 +650,6 @@
         position="2 2.5 -4"
         scale="1 1 1"
         proximity-loader="rig: #rig; threshold: 5; src: url(assets/silksong.glb)"
-      >
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
         easing: linear" >
       </a-entity>
@@ -661,7 +660,6 @@
         position="4 2.5 -5"
         scale="1 1 1"
         proximity-loader="rig: #rig; threshold: 5; src: url(assets/kawasaki.glb)"
-      >
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
         easing: linear" >
       </a-entity>
@@ -959,7 +957,7 @@
               this.el.removeAttribute("gltf-model");
               this.loaded = false;
               this.el.setAttribute("visible", false);
-              this.triggered = false;
+              return;
           }
         },
       });
