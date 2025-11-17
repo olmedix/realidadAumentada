@@ -953,6 +953,11 @@
             // Carga ASÍNCRONA 
             this.el.setAttribute("gltf-model", this.data.src);
             this.triggered = true; // para no pedirlo más veces
+          }else {
+              this.el.removeAttribute("gltf-model");
+              this.loaded = false;
+              this.el.setAttribute("visible", false);
+              this.triggered = false;
           }
         },
       });
