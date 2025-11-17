@@ -639,7 +639,7 @@
         id="robot"
         position="0 2.5 -2.5"
         scale="1 1 1"
-        proximity-loader="rig: #rig; threshold: 5; src: url(assets/modelo.glb)"
+        proximity-loader="rig: #rig; loadDist: 2; unloadDist: 2.5; src: url(assets/modelo.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
       >
       </a-entity>
@@ -649,7 +649,7 @@
         id="silkong"
         position="2 2.5 -4"
         scale="1 1 1"
-        proximity-loader="rig: #rig; threshold: 5; src: url(assets/silksong.glb)"
+        proximity-loader="rig: #rig; loadDist: 2; unloadDist: 2.5; src: url(assets/silksong.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
         easing: linear"
       >
@@ -658,9 +658,9 @@
       <!-- Kawasaki -->
       <a-entity
         id="kawasaki"
-        position="-2 2.5 -5"
+        position="-1 2.5 -4.5"
         scale="1 1 1"
-        proximity-loader="rig: #rig; loadDist: 2; unloadDist: 3.5; src: url(assets/kawasaki.glb)"
+        proximity-loader="rig: #rig; loadDist: 2; unloadDist: 2.5; src: url(assets/kawasaki.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
         easing: linear"
       >
@@ -929,7 +929,7 @@
         schema: {
           rig: { type: "selector" },
           loadDist: { type: "number", default: 2 },
-          unloadDist: { type: "number", default: 3 },
+          unloadDist: { type: "number", default: 2.2},
           src: { type: "string" },
         },
         init: function () {
