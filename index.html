@@ -634,13 +634,35 @@
       ></a-text>
 
       <!-- Robot -->
+      <!-- gltf-model="url(assets/modelo.glb)" -->
       <a-entity
         id="robot"
         position="0 2.5 -2"
         scale="1 1 1"
-        gltf-model="url(assets/modelo.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"
       >
+      </a-entity>
+
+      <!-- Silkong -->
+      <a-entity
+        id="silkong"
+        position="0 2.5 -3"
+        scale="1 1 1"
+        proximity-loader="rig: #rig; threshold: 5; src: url(assets/silksong.glb)"
+      >
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
+        easing: linear" >
+      </a-entity>
+
+      <!-- Kawasaki -->
+      <a-entity
+        id="kawasaki"
+        position="0 2.5 -4"
+        scale="1 1 1"
+        proximity-loader="rig: #rig; threshold: 5; src: url(assets/kawasaki.glb)"
+      >
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
+        easing: linear" >
       </a-entity>
 
       <a-light
@@ -899,6 +921,42 @@
     >
 
     <script>
+      // ========================================
+      // CARGA MODELOS 3D CON PROXIMITY-LOADER
+      // ========================================
+      AFRAME.registerComponent("proximity-loader", {
+        schema: {
+          rig: { type: "selector" },
+          threshold: { type: "number", default: 2 },
+          modelUrl: { type: "string" },
+        },
+        init: function () {
+          this.triggered = false;
+          this.loaded = false;
+          o;
+          this.el.setAttribute("visible", false);
+
+          // Cuando el modelo termine de cargarse
+          this.el.addEventListener("model-loaded", () => {
+            this.loaded = true;
+            this.el.setAttribute("visible", true);
+          });
+        },
+        tick: function () {
+          if (this.triggered || !this.data.rig) return;
+
+          const rigZ = this.data.rig.object3D.position.z;
+          const objZ = this.el.object3D.position.z;
+          const dz = Math.abs(objZ - rigZ);
+
+          if (dz < this.data.threshold) {
+            // Carga ASÍNCRONA 
+            this.el.setAttribute("gltf-model", this.data.src);
+            this.triggered = true; // para no pedirlo más veces
+          }
+        },
+      });
+
       // ========================================
       // CON DETECCIÓN DE ROTACIÓN
       // ========================================
@@ -1455,7 +1513,7 @@
           rigObj.position.z = THREE.MathUtils.clamp(rigObj.position.z, -50, 50);
           rigObj.position.x = THREE.MathUtils.clamp(rigObj.position.x, -50, 50);
 
-          rigObj.position.y = 1.6;   // 👈 mantener Y fija siempre
+          rigObj.position.y = 1.6; // 👈 mantener Y fija siempre
 
           this.hud.pos.setAttribute(
             "value",
