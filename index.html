@@ -1593,9 +1593,11 @@
       navigator.mediaDevices
         .getUserMedia({
           video: {
-            facingMode: "environment",
-            width: { ideal: 640 },
-            height: { ideal: 480 },
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            aspectRatio: { ideal: 16 / 9 },
+            zoom: 0.6, // 👈 ultra-wide
           },
         })
         .then((stream) => {
