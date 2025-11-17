@@ -651,17 +651,19 @@
         scale="1 1 1"
         proximity-loader="rig: #rig; threshold: 5; src: url(assets/silksong.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
-        easing: linear" >
+        easing: linear"
+      >
       </a-entity>
 
       <!-- Kawasaki -->
       <a-entity
         id="kawasaki"
-        position="4 2.5 -10"
+        position="4 2.5 -8"
         scale="1 1 1"
-        proximity-loader="rig: #rig; threshold: 5; src: url(assets/kawasaki.glb)"
+        proximity-loader="rig: #rig; loadDist: 2; unloadDist: 3.5; src: url(assets/kawasaki.glb)"
         animation="property: rotation; to: 0 360 0; loop: true; dur: 10000;
-        easing: linear" >
+        easing: linear"
+      >
       </a-entity>
 
       <a-light
@@ -926,7 +928,8 @@
       AFRAME.registerComponent("proximity-loader", {
         schema: {
           rig: { type: "selector" },
-          threshold: { type: "number", default: 2 },
+          tloadDist: { type: "number", default: 2 },
+          unloadDist: { type: "number", default: 3.5 },
           src: { type: "string" },
         },
         init: function () {
@@ -941,23 +944,24 @@
           });
         },
         tick: function () {
-          if (this.triggered || !this.data.rig) return;
+          if (!this.data.rig) return;
 
           const rigZ = this.data.rig.object3D.position.z;
           const objZ = this.el.object3D.position.z;
           const dz = Math.abs(objZ - rigZ);
 
-          if (dz < this.data.threshold) {
-            // Carga ASÍNCRONA 
+          // ----------- CARGAR -----------
+          if (!this.loaded && dz < this.data.loadDist) {
             this.el.setAttribute("gltf-model", this.data.src);
-            this.triggered = true; // para no pedirlo más veces
+            return;
           }
 
-          if(dz > this.data.threshold + 1) {
-              this.el.removeAttribute("gltf-model");
-              this.loaded = false;
-              this.el.setAttribute("visible", false);
-              return;
+          // ----------- DESCARGAR -----------
+          if (this.loaded && dz > this.data.unloadDist) {
+            this.el.removeAttribute("gltf-model");
+            this.el.setAttribute("visible", false);
+            this.loaded = false;
+            return;
           }
         },
       });
@@ -1482,7 +1486,6 @@
             -maxVelX,
             maxVelX
           );
-
 
           const rigObj = this.el.object3D;
 
